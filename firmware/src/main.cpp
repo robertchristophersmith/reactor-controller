@@ -55,10 +55,12 @@ void loop() {
     case CMD_SET_TEMP:
       if (cmd.zone == 0)
         heaters.setSetpoints(cmd.value, heaters.getSetpointVaporizer(),
-                             heaters.getSetpointReactor());
+                             heaters.getSetpointReactor1(),
+                             heaters.getSetpointReactor2());
       if (cmd.zone == 1)
         heaters.setSetpoints(heaters.getSetpointGas(), cmd.value,
-                             heaters.getSetpointReactor());
+                             heaters.getSetpointReactor1(),
+                             heaters.getSetpointReactor2());
       if (cmd.zone == 2)
         heaters.setSetpoints(heaters.getSetpointGas(),
                              heaters.getSetpointVaporizer(), cmd.value,

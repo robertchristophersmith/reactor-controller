@@ -70,6 +70,7 @@ void SerialComms::sendTelemetry(const SensorData &sensors,
   s["p_reac"] = sensors.pressureReactorBar;
   s["flow"] = sensors.flowRateSccm;
   s["h2"] = sensors.h2ConcentrationPpm;
+  s["status"] = sensors.sensorStatus;
 
   // Heaters
   JsonObject h = doc.createNestedObject("heaters");

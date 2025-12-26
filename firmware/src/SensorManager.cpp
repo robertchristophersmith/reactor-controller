@@ -40,37 +40,96 @@ void SensorManager::begin() {
 }
 
 void SensorManager::update() {
-  // Read TCs
-  _currentData.tempGasInternal = _tcGasInternal->readCelsius();
-  _currentData.tempFeedstock = _tcFeedstock->readCelsius();
-  _currentData.tempVaporizerWall = _tcVaporizerWall->readCelsius();
-  _currentData.tempReactorInt1 = _tcReactorInt1->readCelsius();
-  _currentData.tempReactorInt2 = _tcReactorInt2->readCelsius();
-  _currentData.tempReactorExt1 = _tcReactorExt1->readCelsius();
-  _currentData.tempReactorExt2 = _tcReactorExt2->readCelsius();
+  _currentData.sensorStatus = 0;
 
-  // Check for errors (NaN)
-  if (isnan(_currentData.tempGasInternal) ||
-      isnan(_currentData.tempReactorInt1)) {
+  // Read TCs and check for errors
+  _currentData.tempGasInternal = _tcGasInternal->readCelsius();
+  if (isnan(_currentData.tempGasInternal))
+    _currentData.sensorStatus |= ERR_TC_GAS_INTERNAL;
+
+  _currentData.tempFeedstock = _tcFeedstock->readCelsius();
+  if (isnan(_currentData.tempFeedstock))
+    _currentData.sensorStatus |= ERR_TC_FEEDSTOCK;
+
+  _currentData.tempVaporizerWall = _tcVaporizerWall->readCelsius();
+  if (isnan(_currentData.tempVaporizerWall))
+    _currentData.sensorStatus |= ERR_TC_VAPORIZER_WALL;
+
+  _currentData.tempReactorInt1 = _tcReactorInt1->readCelsius();
+  if (isnan(_currentData.tempReactorInt1))
+    _currentData.sensorStatus |= ERR_TC_REACTOR_INT_1;
+
+  _currentData.tempReactorInt2 = _tcReactorInt2->readCelsius();
+  if (isnan(_currentData.tempReactorInt2))
+    _currentData.sensorStatus |= ERR_TC_REACTOR_INT_2;
+
+  _currentData.tempReactorExt1 = _tcReactorExt1->readCelsius();
+  if (isnan(_currentData.tempReactorExt1))
+    _currentData.sensorStatus |= ERR_TC_REACTOR_EXT_1;
+
+  _currentData.tempReactorExt2 = _tcReactorExt2->readCelsius();
+  if (isnan(_currentData.tempReactorExt2))
+    _currentData.sensorStatus |= ERR_TC_REACTOR_EXT_2;
+
+  // Global health check based on critical sensors
+  if ((_currentData.sensorStatus & ERR_TC_GAS_INTERNAL) ||
+      (_currentData.sensorStatus & ERR_TC_REACTOR_INT_1)) {
     _currentData.sensorsHealthy = false;
   } else {
     _currentData.sensorsHealthy = true;
   }
 
-  // Read ADCs with 0.5-4.5V scaling
+  // --- Read ADCs with 0.5-4.5V scaling and Disconnect Detection ---
 
-  // Pressure: 0.5V=0psig, 4.5V=30psig
-  _currentData.pressureFeedBar = readScaled(_adsPressure, ADC_CH_PRESSURE, 0.5,
-                                            4.5, 0.0, PRESSURE_MAX_PSIG);
-  _currentData.pressureReactorBar = 0; // Not connected?
+  // Helper to read voltage for diagnostics
+  auto getVolts = [&](Adafruit_ADS1115 &ads, int ch) -> float {
+    return ads.computeVolts(ads.readADC_SingleEnded(ch));
+  };
 
-  // Flow: 0.5V=0sccm, 4.5V=3000sccm
-  _currentData.flowRateSccm = readScaled(_adsMFC, ADC_CH_MFC_FLOW_READ, 0.5,
-                                         4.5, 0.0, MFC_FLOW_MAX_SCCM);
+  // 1. Pressure
+  float pVolts = getVolts(_adsPressure, ADC_CH_PRESSURE);
+  if (pVolts < 0.2) { // Disconnected (Floating/Pull-down) or Broken Wire
+    _currentData.sensorStatus |= ERR_P_FEED;
+    _currentData.pressureFeedBar = 0;
+  } else {
+    // Scale: 0.5V=0, 4.5V=Max. Clamp logic inside readScaled-like math
+    if (pVolts <= 0.5)
+      _currentData.pressureFeedBar = 0.0;
+    else if (pVolts >= 4.5)
+      _currentData.pressureFeedBar = PRESSURE_MAX_PSIG;
+    else
+      _currentData.pressureFeedBar = (pVolts - 0.5) * (PRESSURE_MAX_PSIG / 4.0);
+  }
 
-  // H2: 0.5V=0%, 4.5V=100%
-  _currentData.h2ConcentrationPpm =
-      readScaled(_adsH2, ADC_CH_H2_SENSOR, 0.5, 4.5, 0.0, H2_MAX_PERCENT);
+  _currentData.pressureReactorBar = 0; // Placeholder
+
+  // 2. Flow (MFC)
+  float fVolts = getVolts(_adsMFC, ADC_CH_MFC_FLOW_READ);
+  if (fVolts < 0.2) {
+    _currentData.sensorStatus |= ERR_MFC_FLOW;
+    _currentData.flowRateSccm = 0;
+  } else {
+    if (fVolts <= 0.5)
+      _currentData.flowRateSccm = 0.0;
+    else if (fVolts >= 4.5)
+      _currentData.flowRateSccm = MFC_FLOW_MAX_SCCM;
+    else
+      _currentData.flowRateSccm = (fVolts - 0.5) * (MFC_FLOW_MAX_SCCM / 4.0);
+  }
+
+  // 3. H2 Sensor
+  float hVolts = getVolts(_adsH2, ADC_CH_H2_SENSOR);
+  if (hVolts < 0.2) {
+    _currentData.sensorStatus |= ERR_H2_SENSOR;
+    _currentData.h2ConcentrationPpm = 0;
+  } else {
+    if (hVolts <= 0.5)
+      _currentData.h2ConcentrationPpm = 0.0;
+    else if (hVolts >= 4.5)
+      _currentData.h2ConcentrationPpm = H2_MAX_PERCENT;
+    else
+      _currentData.h2ConcentrationPpm = (hVolts - 0.5) * (H2_MAX_PERCENT / 4.0);
+  }
 }
 
 SensorData SensorManager::getLastReadings() { return _currentData; }

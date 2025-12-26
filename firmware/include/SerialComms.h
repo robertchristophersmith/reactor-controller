@@ -2,10 +2,10 @@
 #define SERIAL_COMMS_H
 
 #include "FlowController.h"
+#include "HeaterController.h"
 #include "SensorManager.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
-
 
 enum CommandType {
   CMD_NONE,
