@@ -21,15 +21,21 @@ The firmware is built using **PlatformIO**. You can install it using Visual Stud
 4. Click the **PlatformIO icon** (Alien face) in the sidebar.
 5. Under **Project Tasks**, select your environment (e.g., `megaatmega2560`) and click **Upload**.
 
-### Option B: Command Line (CLI)
-1. Install PlatformIO Core: `pip install platformio`
+### Option B: Command Line (CLI) - Linux/Raspberry Pi
+1. **Recommended Method**: Use the installer script (works best on Raspberry Pi):
+   ```bash
+   curl -fsSL -o get-platformio.py https://raw.githubusercontent.com/platformio/platformio-core-installer/master/get-platformio.py
+   python3 get-platformio.py
+   ```
+   *Follow the on-screen instructions to add the `pio` command to your PATH.*
+
 2. Navigate to the firmware directory:
    ```bash
-   cd firmware
+   cd ~/reactor-controller/firmware
    ```
 3. Build and Upload:
    ```bash
-   pio run -t upload
+   ~/.platformio/penv/bin/pio run -t upload
    ```
 
 ---
