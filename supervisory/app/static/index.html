@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reactor Controller</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin
+        src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.12.0/Recharts.min.js"></script>
+</head>
+
+<body class="bg-gray-900 text-white font-sans">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = Recharts;
+
+        const STATE_LABELS = ["STANDBY", "WARMUP", "WORKING", "ALARM", "FAULT"];
+        const STATE_COLORS = ["text-gray-400", "text-yellow-400", "text-green-400", "text-orange-500", "text-red-500"];
+
+        function App() {
+            const [data, setData] = useState([]);
+            const [latest, setLatest] = useState(null);
+            const [status, setStatus] = useState("DISCONNECTED");
+
+            useEffect(() => {
+                const ws = new WebSocket(`ws://${window.location.host}/ws`);
+
+                ws.onopen = () => setStatus("CONNECTED");
+                ws.onclose = () => setStatus("DISCONNECTED");
+
+                ws.onmessage = (event) => {
+                    const msg = JSON.parse(event.data);
+                    // Add ts for graph
+                    msg.ts = new Date().toLocaleTimeString();
+
+                    setLatest(msg);
+                    setData(prev => {
+                        const next = [...prev, msg];
+                        if (next.length > 100) next.shift();
+                        return next;
+                    });
+                };
+
+                return () => ws.close();
+            }, []);
+
+            const sendState = async (s) => {
+                await fetch(`/api/control/state/${s}`, { method: 'POST' });
+            }
+
+            const sendSetpoint = async (zone, val, rate) => {
+                await fetch(`/api/control/setpoint?zone=${zone}&value=${val}&rate=${rate || 0}`, { method: 'POST' });
+            }
+
+            if (!latest) return <div className="p-10 text-center">Waiting for telemetry...</div>;
+
+            const s = latest.sensors || {};
+            const h = latest.heaters || {};
+            const sp = latest.sp || {};
+            const stateIdx = latest.state || 0;
+
+            return (
+                <div className="min-h-screen p-4 flex flex-col gap-4">
+                    {/* Header */}
+                    <header className="bg-gray-800 p-4 rounded-lg shadow-lg flex justify-between items-center">
+                        <h1 className="text-2xl font-bold tracking-tight text-blue-400">Reactor Controller</h1>
+                        <div className="flex gap-4 items-center">
+                            <div className={`text-xl font-bold ${STATE_COLORS[stateIdx]}`}>
+                                {STATE_LABELS[stateIdx] || "UNKNOWN"}
+                            </div>
+                            <div className="text-sm text-gray-400">uptime: {latest.uptime}s</div>
+                        </div>
+                    </header>
+
+                    {/* Controls */}
+                    <div className="flex gap-2">
+                        <button onClick={() => sendState(0)} className="bg-gray-700 px-4 py-2 hover:bg-gray-600 rounded">STANDBY</button>
+                        <button onClick={() => sendState(1)} className="bg-yellow-700 px-4 py-2 hover:bg-yellow-600 rounded">WARMUP</button>
+                        <button onClick={() => sendState(2)} className="bg-green-700 px-4 py-2 hover:bg-green-600 rounded">WORKING</button>
+                    </div>
+
+                    {/* Process Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {/* Zone 1: Gas */}
+                        <ZoneCard title="Gas Pre-Heat"
+                            temp={s.t_gas} sp={sp.gas} out={h.gas}
+                            onSetSp={(v, r) => sendSetpoint(0, v, r)} />
+
+                        {/* Zone 2: Vaporizer */}
+                        <ZoneCard title="Vaporizer"
+                            temp={s.t_vap} sp={sp.vap} out={h.vap}
+                            onSetSp={(v, r) => sendSetpoint(1, v, r)} />
+
+                        {/* Zone 3: Reactor 1 */}
+                        <ZoneCard title="Reactor 1"
+                            temp={(s.t_r_i1 + s.t_r_e1) / 2}
+                            sub={`I:${s.t_r_i1} E:${s.t_r_e1}`}
+                            sp={sp.reac1} out={h.reac1}
+                            onSetSp={(v, r) => sendSetpoint(2, v, r)} />
+
+                        {/* Zone 4: Reactor 2 */}
+                        <ZoneCard title="Reactor 2"
+                            temp={(s.t_r_i2 + s.t_r_e2) / 2}
+                            sub={`I:${s.t_r_i2} E:${s.t_r_e2}`}
+                            sp={sp.reac2} out={h.reac2}
+                            onSetSp={(v, r) => sendSetpoint(3, v, r)} />
+
+                        {/* Flow Control */}
+                        <FlowCard title="Mass Flow"
+                            flow={s.flow} sp={sp.flow}
+                            onSet={(v) => fetch(`/api/control/flow?value=${v}`, { method: 'POST' })} />
+
+                        {/* Sensors */}
+                        <SensorCard title="Pressure" value={s.p_feed} unit="psig" color="text-red-400" border="border-red-500" />
+                        <SensorCard title="H2 Sensor" value={s.h2} unit="%" color="text-pink-400" border="border-pink-500" />
+                    </div>
+
+                    {/* Chart */}
+                    <div className="flex-1 bg-gray-800 p-4 rounded-lg min-h-[400px]">
+                        <ResponsiveContainer width="100%" height={400}>
+                            <LineChart data={data}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                                <XAxis dataKey="ts" stroke="#9CA3AF" />
+                                <YAxis stroke="#9CA3AF" />
+                                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: 'none' }} />
+                                <Legend />
+                                <Line type="monotone" dataKey="sensors.t_gas" stroke="#60A5FA" dot={false} name="Gas" />
+                                <Line type="monotone" dataKey="sensors.t_vap" stroke="#FBBF24" dot={false} name="Vap" />
+                                <Line type="monotone" dataKey="sensors.t_r_i1" stroke="#34D399" dot={false} name="R1 Int" />
+                                <Line type="monotone" dataKey="sensors.t_r_e1" stroke="#059669" dot={false} name="R1 Ext" />
+                                <Line type="monotone" dataKey="sensors.t_r_i2" stroke="#A78BFA" dot={false} name="R2 Int" />
+                                <Line type="monotone" dataKey="sensors.t_r_e2" stroke="#7C3AED" dot={false} name="R2 Ext" />
+                                <Line type="monotone" dataKey="sensors.p_feed" stroke="#EF4444" dot={false} name="Press (psi)" />
+                                <Line type="monotone" dataKey="sensors.h2" stroke="#EC4899" dot={false} name="H2 (%)" />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            );
+        }
+
+
+
+        function FlowCard({ title, flow, sp, onSet }) {
+            const [val, setVal] = useState(sp);
+            return (
+                <div className="bg-gray-800 p-4 rounded-lg border border-purple-500 shadow shadow-purple-900/20">
+                    <h3 className="text-lg font-semibold text-purple-300 mb-2">{title}</h3>
+                    <div className="flex justify-between items-end mb-4">
+                        <div>
+                            <div className="text-4xl font-mono">{(flow || 0).toFixed(1)}</div>
+                            <div className="text-sm text-gray-500">SCCM</div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-sm text-gray-400">Setpoint</div>
+                            <div className="text-xl font-mono text-purple-300">{(sp || 0).toFixed(0)}</div>
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <input type="number"
+                            className="bg-gray-900 border border-gray-600 rounded px-2 py-1 w-20 text-white"
+                            value={val} onChange={(e) => setVal(e.target.value)} />
+                        <button
+                            className="bg-purple-600 px-3 py-1 rounded hover:bg-purple-500"
+                            onClick={() => onSet(val)}>SET</button>
+                    </div>
+                </div>
+            );
+        }
+
+        function SensorCard({ title, value, unit, color, border }) {
+            return (
+                <div className={`bg-gray-800 p-4 rounded-lg border ${border} shadow opacity-90`}>
+                    <h3 className={`text-lg font-semibold mb-2 ${color}`}>{title}</h3>
+                    <div>
+                        <div className="text-4xl font-mono">{(value || 0).toFixed(2)}</div>
+                        <div className="text-sm text-gray-500">{unit}</div>
+                    </div>
+                </div>
+            );
+        }
+
+        function ZoneCard({ title, temp, sub, sp, out, onSetSp }) {
+            const [val, setVal] = useState(sp);
+            const [rate, setRate] = useState(0);
+
+            return (
+                <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-300 mb-2">{title}</h3>
+                    <div className="flex justify-between items-end mb-4">
+                        <div>
+                            <div className="text-4xl font-mono">{(temp || 0).toFixed(1)}&deg;C</div>
+                            {sub && <div className="text-xs text-gray-400 font-mono mt-1">{sub}</div>}
+                            <div className="text-sm text-gray-500">Output: {(out / 10).toFixed(0)}%</div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-sm text-gray-400">Setpoint</div>
+                            <div className="text-xl font-mono text-blue-300">{(sp || 0).toFixed(0)}&deg;C</div>
+                        </div>
+                    </div>
+                    <div className="flex gap-2 items-center">
+                        <div className="flex flex-col">
+                            <label className="text-xs text-gray-500">Target</label>
+                            <input type="number"
+                                className="bg-gray-900 border border-gray-600 rounded px-2 py-1 w-20 text-white"
+                                value={val} onChange={(e) => setVal(e.target.value)} />
+                        </div>
+                        <div className="flex flex-col">
+                            <label className="text-xs text-gray-500">Rate/min</label>
+                            <input type="number"
+                                className="bg-gray-900 border border-gray-600 rounded px-2 py-1 w-16 text-white"
+                                placeholder="Opt"
+                                value={rate} onChange={(e) => setRate(e.target.value)} />
+                        </div>
+                        <button
+                            className="bg-blue-600 px-3 py-1 rounded hover:bg-blue-500 h-10 mt-4"
+                            onClick={() => onSetSp(val, rate)}>SET</button>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
