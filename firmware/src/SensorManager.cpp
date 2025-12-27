@@ -32,11 +32,14 @@ void SensorManager::begin() {
 
   // Initialize ADCs
   if (!_adsMFC.begin(I2C_ADDR_ADS1115_MFC))
-    Serial.println("Failed: ADS MFC");
+    // Serial.println("Failed: ADS MFC");
+    ;
   if (!_adsPressure.begin(I2C_ADDR_ADS1115_PRESSURE))
-    Serial.println("Failed: ADS Pressure");
+    // Serial.println("Failed: ADS Pressure");
+    ;
   if (!_adsH2.begin(I2C_ADDR_ADS1115_H2))
-    Serial.println("Failed: ADS H2");
+    // Serial.println("Failed: ADS H2");
+    ;
 }
 
 void SensorManager::update() {
