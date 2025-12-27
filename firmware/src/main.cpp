@@ -29,7 +29,8 @@ void checkSafety(SensorData &data);
 void setup() {
   Serial.begin(SERIAL_BAUD);
   while (!Serial)
-    delay(10); // Wait for USB
+    delay(10);    // Wait for USB
+  Serial.flush(); // Clear any garbage
 
   sensors.begin();
   heaters.begin();
