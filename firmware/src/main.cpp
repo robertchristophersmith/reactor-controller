@@ -30,7 +30,7 @@ void setup() {
   Serial.begin(SERIAL_BAUD);
   while (!Serial)
     delay(10); // Wait for USB
-  delay(100);
+  Serial.println("BOOT");
 
   sensors.begin();
   heaters.begin();
