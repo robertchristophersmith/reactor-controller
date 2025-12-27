@@ -89,6 +89,7 @@ class Orchestrator:
                     await q.put(data)
                 except Exception:
                     self.subscribers.remove(q)
+            print(f"Orchestrator: Processed telemetry. Buffer size: {len(self.live_buffer)}") # DEBUG
         except Exception as e:
             logger.error(f"Error in handle_telemetry: {e}")
             print(f"CRITICAL ORCHESTRATOR ERROR: {e}")
