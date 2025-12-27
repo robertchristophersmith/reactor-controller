@@ -37,16 +37,22 @@ class SerialInterface:
             try:
                 line = await self.reader.readline()
                 if line:
+                    decoded = line.decode('utf-8', errors='ignore').strip()
+                    print(f"RAW SERIAL: {decoded}") # DEBUG
+                    
                     try:
-                        data = json.loads(line.decode('utf-8').strip())
+                        data = json.loads(decoded)
                         if "uptime" in data or "state" in data:
                              if self.telemetry_callback:
                                  await self.telemetry_callback(data)
                         elif "error" in data:
+                            print(f"FIRMWARE ERROR: {data['error']}")
                             logger.error(f"FIRMWARE ERROR: {data['error']}")
                     except json.JSONDecodeError:
+                        print(f"Malformed JSON: {decoded}")
                         logger.warning(f"Malformed JSON: {line}")
             except Exception as e:
+                print(f"Serial read error: {e}")
                 logger.error(f"Serial read error: {e}")
                 await asyncio.sleep(1)
 
