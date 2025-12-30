@@ -8,6 +8,8 @@
 
 // --- SPI Bus (MAX31855 Thermocouples) ---
 // Hardware SPI: SCK=52, MISO=50
+#define PIN_SPI_SCK 52
+#define PIN_SPI_MISO 50
 #define PIN_SPI_CS_TC_GAS_INTERNAL 22   // Gas Preheat
 #define PIN_SPI_CS_TC_VAPORIZER_WALL 23 // Vaporizer Wall
 #define PIN_SPI_CS_TC_REACTOR_EXT_1 24  // Reactor Zone 1 External

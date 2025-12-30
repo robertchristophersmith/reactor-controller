@@ -1,13 +1,20 @@
 #include "SensorManager.h"
 
 SensorManager::SensorManager() {
-  _tcGasInternal = new Adafruit_MAX31855(PIN_SPI_CS_TC_GAS_INTERNAL);
-  _tcFeedstock = new Adafruit_MAX31855(PIN_SPI_CS_TC_FEEDSTOCK);
-  _tcVaporizerWall = new Adafruit_MAX31855(PIN_SPI_CS_TC_VAPORIZER_WALL);
-  _tcReactorInt1 = new Adafruit_MAX31855(PIN_SPI_CS_TC_REACTOR_INT_1);
-  _tcReactorInt2 = new Adafruit_MAX31855(PIN_SPI_CS_TC_REACTOR_INT_2);
-  _tcReactorExt1 = new Adafruit_MAX31855(PIN_SPI_CS_TC_REACTOR_EXT_1);
-  _tcReactorExt2 = new Adafruit_MAX31855(PIN_SPI_CS_TC_REACTOR_EXT_2);
+  _tcGasInternal = new Adafruit_MAX31855(
+      PIN_SPI_SCK, PIN_SPI_CS_TC_GAS_INTERNAL, PIN_SPI_MISO);
+  _tcFeedstock =
+      new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_FEEDSTOCK, PIN_SPI_MISO);
+  _tcVaporizerWall = new Adafruit_MAX31855(
+      PIN_SPI_SCK, PIN_SPI_CS_TC_VAPORIZER_WALL, PIN_SPI_MISO);
+  _tcReactorInt1 = new Adafruit_MAX31855(
+      PIN_SPI_SCK, PIN_SPI_CS_TC_REACTOR_INT_1, PIN_SPI_MISO);
+  _tcReactorInt2 = new Adafruit_MAX31855(
+      PIN_SPI_SCK, PIN_SPI_CS_TC_REACTOR_INT_2, PIN_SPI_MISO);
+  _tcReactorExt1 = new Adafruit_MAX31855(
+      PIN_SPI_SCK, PIN_SPI_CS_TC_REACTOR_EXT_1, PIN_SPI_MISO);
+  _tcReactorExt2 = new Adafruit_MAX31855(
+      PIN_SPI_SCK, PIN_SPI_CS_TC_REACTOR_EXT_2, PIN_SPI_MISO);
 }
 
 void SensorManager::begin() {
@@ -103,8 +110,16 @@ void SensorManager::update() {
     }
     // Also check for 0.0 which might be suspicious if all are 0
     if (t == 0.0) {
-      // Check if it's a real 0 or an error that didn't return NAN (some old
-      // libs?)
+      // Check internal temp logic
+      float internal = tc->readInternal();
+      if (internal == 0.0) {
+        Serial.print("Error Zero/Zero ");
+        Serial.print(name);
+        Serial.println(" (Check SPI MISO/Wiring)");
+      } else {
+        // Maybe it's just really cold? Unlikely to be exactly 0.00
+      }
+
       uint8_t err = tc->readError();
       if (err) {
         Serial.print("Error (0.0) ");
