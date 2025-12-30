@@ -33,9 +33,16 @@ void setup() {
   Serial.println("BOOT");
 
   sensors.begin();
+  Serial.println("Sensors init done");
+
   heaters.begin();
+  Serial.println("Heaters init done");
+
   flow.begin();
+  Serial.println("Flow init done");
+
   comms.begin();
+  Serial.println("Comms init done");
 
   startTime = millis();
   lastHeartbeatTime = millis();
@@ -78,6 +85,8 @@ void loop() {
       flow.setFlow(cmd.value);
       break;
     case CMD_HEARTBEAT:
+      break;
+    case CMD_NONE:
       break;
     }
   }
