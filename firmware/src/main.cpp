@@ -30,6 +30,8 @@ void setup() {
   Serial.begin(SERIAL_BAUD);
   // while (!Serial)
   //   delay(10); // Wait for USB
+  delay(1000); // Give time for Serial to stabilize
+  Serial.println("=== BOOT START ===");
   Serial.println("BOOT");
 
   sensors.begin();
