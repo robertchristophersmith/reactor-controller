@@ -32,16 +32,21 @@ void SensorManager::begin() {
 
   // Initialize ADCs
   // Initialize ADCs
-  Serial.println("Init: ADCs starting...");
+  Serial.println("Init: ADCs starting... (DISABLED by User Request)");
 
-  Serial.println("Init: MFC ADS1115... SKIPPED (DEBUG)");
+  // Initialize Wire manually to set timeout to prevent hangs
+  // Wire.begin();
+  // Set timeout to 3000us (3ms) and reset_on_timeout=true
+  // This prevents infinite hanging if the bus is stuck or missing
+  // Wire.setWireTimeout(3000, true);
+
   /*
+  Serial.println("Init: MFC ADS1115...");
   if (!_adsMFC.begin(I2C_ADDR_ADS1115_MFC)) {
     Serial.println("Failed: ADS MFC");
   } else {
     Serial.println("OK: ADS MFC");
   }
-  */
 
   Serial.println("Init: Pressure ADS1115...");
   if (!_adsPressure.begin(I2C_ADDR_ADS1115_PRESSURE)) {
@@ -56,6 +61,7 @@ void SensorManager::begin() {
   } else {
     Serial.println("OK: ADS H2");
   }
+  */
 
   Serial.println("Init: Sensors Done");
 }

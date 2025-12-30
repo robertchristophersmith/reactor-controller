@@ -7,10 +7,14 @@ FlowController::FlowController() {
 
 bool FlowController::begin() {
   // Initialize DAC with default address
-  bool res = dac.begin(I2C_ADDR_MFC_DAC);
+  Serial.println("Init: MFC DAC... (DISABLED by User Request)");
+  // bool res = dac.begin(I2C_ADDR_MFC_DAC);
+  bool res = false;
+  /*
   if (!res) {
     Serial.println("Failed: MFC DAC");
   }
+  */
 
   setEnabled(false); // Default to off
   // Even if failed, we return true to let main loop run (or handle error
