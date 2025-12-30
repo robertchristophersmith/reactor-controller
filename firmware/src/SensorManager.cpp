@@ -34,12 +34,14 @@ void SensorManager::begin() {
   // Initialize ADCs
   Serial.println("Init: ADCs starting...");
 
-  Serial.println("Init: MFC ADS1115...");
+  Serial.println("Init: MFC ADS1115... SKIPPED (DEBUG)");
+  /*
   if (!_adsMFC.begin(I2C_ADDR_ADS1115_MFC)) {
     Serial.println("Failed: ADS MFC");
   } else {
     Serial.println("OK: ADS MFC");
   }
+  */
 
   Serial.println("Init: Pressure ADS1115...");
   if (!_adsPressure.begin(I2C_ADDR_ADS1115_PRESSURE)) {
