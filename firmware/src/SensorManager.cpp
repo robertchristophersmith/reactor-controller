@@ -12,7 +12,10 @@ SensorManager::SensorManager() {
 
 void SensorManager::begin() {
   // Initialize SPI TCs - Library handles SPI begin internally but good practice
-  // to ensure pin modes
+  // to ensure pin modes. Actually, for hardware SPI, we MUST call SPI.begin()
+  SPI.begin();
+
+  // Initialize CS Pins
   pinMode(PIN_SPI_CS_TC_GAS_INTERNAL, OUTPUT);
   pinMode(PIN_SPI_CS_TC_FEEDSTOCK, OUTPUT);
   pinMode(PIN_SPI_CS_TC_VAPORIZER_WALL, OUTPUT);
