@@ -83,10 +83,7 @@ void SensorManager::update() {
   }
 
   // --- Read ADCs with 0.5-4.5V scaling and Disconnect Detection ---
-
-  // Helper to read voltage for diagnostics
-  // --- Read ADCs with 0.5-4.5V scaling and Disconnect Detection ---
-
+  /* Skipped for now to prevent loop hang due to I2C instability
   // Helper: Check if I2C device is alive before reading to prevent hanging
   auto isConnected = [](uint8_t addr) -> bool {
     Wire.beginTransmission(addr);
@@ -121,8 +118,6 @@ void SensorManager::update() {
     _currentData.sensorStatus |= ERR_P_FEED; // Mark as error if I2C missing
     _currentData.pressureFeedBar = 0;
   }
-
-  _currentData.pressureReactorBar = 0; // Placeholder
 
   // 2. Flow (MFC)
   if (isConnected(I2C_ADDR_ADS1115_MFC)) {
@@ -163,6 +158,13 @@ void SensorManager::update() {
     _currentData.sensorStatus |= ERR_H2_SENSOR;
     _currentData.h2ConcentrationPpm = 0;
   }
+  */
+
+  // Default failure values so loop continues
+  _currentData.pressureFeedBar = 0;
+  _currentData.pressureReactorBar = 0;
+  _currentData.flowRateSccm = 0;
+  _currentData.h2ConcentrationPpm = 0;
 }
 
 SensorData SensorManager::getLastReadings() { return _currentData; }
