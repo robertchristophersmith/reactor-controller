@@ -33,14 +33,13 @@ void SensorManager::begin() {
   // Initialize ADCs
   // Initialize ADCs
   if (!_adsMFC.begin(I2C_ADDR_ADS1115_MFC))
-    // Serial.println("Failed: ADS MFC");
-    ;
+    Serial.println("Failed: ADS MFC");
+
   if (!_adsPressure.begin(I2C_ADDR_ADS1115_PRESSURE))
-    // Serial.println("Failed: ADS Pressure");
-    ;
+    Serial.println("Failed: ADS Pressure");
+
   if (!_adsH2.begin(I2C_ADDR_ADS1115_H2))
-    // Serial.println("Failed: ADS H2");
-    ;
+    Serial.println("Failed: ADS H2");
 }
 
 void SensorManager::update() {
@@ -88,54 +87,81 @@ void SensorManager::update() {
   // Helper to read voltage for diagnostics
   // --- Read ADCs with 0.5-4.5V scaling and Disconnect Detection ---
 
+  // Helper: Check if I2C device is alive before reading to prevent hanging
+  auto isConnected = [](uint8_t addr) -> bool {
+    Wire.beginTransmission(addr);
+    return (Wire.endTransmission() == 0);
+  };
+
   // Helper to read voltage for diagnostics
-  auto getVolts = [&](Adafruit_ADS1115 &ads, int ch) -> float {
+  auto getVolts = [&](Adafruit_ADS1115 &ads, int ch, uint8_t addr) -> float {
+    if (!isConnected(addr))
+      return 0.0f;
     return ads.computeVolts(ads.readADC_SingleEnded(ch));
   };
 
   // 1. Pressure
-  float pVolts = getVolts(_adsPressure, ADC_CH_PRESSURE);
-  if (pVolts < 0.2) { // Disconnected (Floating/Pull-down) or Broken Wire
-    _currentData.sensorStatus |= ERR_P_FEED;
-    _currentData.pressureFeedBar = 0;
+  if (isConnected(I2C_ADDR_ADS1115_PRESSURE)) {
+    float pVolts =
+        getVolts(_adsPressure, ADC_CH_PRESSURE, I2C_ADDR_ADS1115_PRESSURE);
+    if (pVolts < 0.2) { // Disconnected (Floating/Pull-down) or Broken Wire
+      _currentData.sensorStatus |= ERR_P_FEED;
+      _currentData.pressureFeedBar = 0;
+    } else {
+      // Scale: 0.5V=0, 4.5V=Max. Clamp logic inside readScaled-like math
+      if (pVolts <= 0.5)
+        _currentData.pressureFeedBar = 0.0;
+      else if (pVolts >= 4.5)
+        _currentData.pressureFeedBar = PRESSURE_MAX_PSIG;
+      else
+        _currentData.pressureFeedBar =
+            (pVolts - 0.5) * (PRESSURE_MAX_PSIG / 4.0);
+    }
   } else {
-    // Scale: 0.5V=0, 4.5V=Max. Clamp logic inside readScaled-like math
-    if (pVolts <= 0.5)
-      _currentData.pressureFeedBar = 0.0;
-    else if (pVolts >= 4.5)
-      _currentData.pressureFeedBar = PRESSURE_MAX_PSIG;
-    else
-      _currentData.pressureFeedBar = (pVolts - 0.5) * (PRESSURE_MAX_PSIG / 4.0);
+    _currentData.sensorStatus |= ERR_P_FEED; // Mark as error if I2C missing
+    _currentData.pressureFeedBar = 0;
   }
 
   _currentData.pressureReactorBar = 0; // Placeholder
 
   // 2. Flow (MFC)
-  float fVolts = getVolts(_adsMFC, ADC_CH_MFC_FLOW_READ);
-  if (fVolts < 0.2) {
+  if (isConnected(I2C_ADDR_ADS1115_MFC)) {
+    float fVolts =
+        getVolts(_adsMFC, ADC_CH_MFC_FLOW_READ, I2C_ADDR_ADS1115_MFC);
+    if (fVolts < 0.2) {
+      _currentData.sensorStatus |= ERR_MFC_FLOW;
+      _currentData.flowRateSccm = 0;
+    } else {
+      if (fVolts <= 0.5)
+        _currentData.flowRateSccm = 0.0;
+      else if (fVolts >= 4.5)
+        _currentData.flowRateSccm = MFC_FLOW_MAX_SCCM;
+      else
+        _currentData.flowRateSccm = (fVolts - 0.5) * (MFC_FLOW_MAX_SCCM / 4.0);
+    }
+  } else {
     _currentData.sensorStatus |= ERR_MFC_FLOW;
     _currentData.flowRateSccm = 0;
-  } else {
-    if (fVolts <= 0.5)
-      _currentData.flowRateSccm = 0.0;
-    else if (fVolts >= 4.5)
-      _currentData.flowRateSccm = MFC_FLOW_MAX_SCCM;
-    else
-      _currentData.flowRateSccm = (fVolts - 0.5) * (MFC_FLOW_MAX_SCCM / 4.0);
   }
 
   // 3. H2 Sensor
-  float hVolts = getVolts(_adsH2, ADC_CH_H2_SENSOR);
-  if (hVolts < 0.2) {
+  if (isConnected(I2C_ADDR_ADS1115_H2)) {
+    float hVolts = getVolts(_adsH2, ADC_CH_H2_SENSOR, I2C_ADDR_ADS1115_H2);
+    if (hVolts < 0.2) {
+      _currentData.sensorStatus |= ERR_H2_SENSOR;
+      _currentData.h2ConcentrationPpm = 0;
+    } else {
+      if (hVolts <= 0.5)
+        _currentData.h2ConcentrationPpm = 0.0;
+      else if (hVolts >= 4.5)
+        _currentData.h2ConcentrationPpm = H2_MAX_PERCENT;
+      else
+        _currentData.h2ConcentrationPpm =
+            (hVolts - 0.5) * (H2_MAX_PERCENT / 4.0);
+    }
+  } else {
     _currentData.sensorStatus |= ERR_H2_SENSOR;
     _currentData.h2ConcentrationPpm = 0;
-  } else {
-    if (hVolts <= 0.5)
-      _currentData.h2ConcentrationPpm = 0.0;
-    else if (hVolts >= 4.5)
-      _currentData.h2ConcentrationPpm = H2_MAX_PERCENT;
-    else
-      _currentData.h2ConcentrationPpm = (hVolts - 0.5) * (H2_MAX_PERCENT / 4.0);
   }
 }
 
