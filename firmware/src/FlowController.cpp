@@ -3,6 +3,7 @@
 FlowController::FlowController() {
   currentSetpointSCCM = 0.0;
   _enabled = false;
+  _initialized = false;
 }
 
 bool FlowController::begin() {
@@ -19,6 +20,7 @@ bool FlowController::begin() {
   setEnabled(false); // Default to off
   // Even if failed, we return true to let main loop run (or handle error
   // upstream) But functionally:
+  _initialized = res;
   return res;
 }
 
@@ -48,9 +50,13 @@ void FlowController::setFlow(float sccm) {
 
     // Apply
     // Write to DAC (false = don't write to EEPROM, faster)
-    dac.setVoltage(dacValue, false);
+    if (_initialized) {
+      dac.setVoltage(dacValue, false);
+    }
   } else {
-    dac.setVoltage(0, false);
+    if (_initialized) {
+      dac.setVoltage(0, false);
+    }
   }
 }
 

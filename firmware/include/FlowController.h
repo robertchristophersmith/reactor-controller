@@ -17,6 +17,7 @@ private:
   Adafruit_MCP4725 dac;
   float currentSetpointSCCM;
   bool _enabled;
+  bool _initialized;
 };
 
 #endif
