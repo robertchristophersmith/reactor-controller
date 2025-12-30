@@ -28,8 +28,8 @@ void checkSafety(SensorData &data);
 
 void setup() {
   Serial.begin(SERIAL_BAUD);
-  while (!Serial)
-    delay(10); // Wait for USB
+  // while (!Serial)
+  //   delay(10); // Wait for USB
   Serial.println("BOOT");
 
   sensors.begin();
