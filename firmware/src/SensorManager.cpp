@@ -25,6 +25,23 @@ void SensorManager::begin() {
   pinMode(PIN_SPI_CS_TC_REACTOR_EXT_2, OUTPUT);
 
   // Deselect all
+  // Initialize TC instances
+  if (!_tcGasInternal->begin())
+    Serial.println("TC Gas Int init failed");
+  if (!_tcFeedstock->begin())
+    Serial.println("TC Feed init failed");
+  if (!_tcVaporizerWall->begin())
+    Serial.println("TC Vap init failed");
+  if (!_tcReactorInt1->begin())
+    Serial.println("TC R-Int1 init failed");
+  if (!_tcReactorInt2->begin())
+    Serial.println("TC R-Int2 init failed");
+  if (!_tcReactorExt1->begin())
+    Serial.println("TC R-Ext1 init failed");
+  if (!_tcReactorExt2->begin())
+    Serial.println("TC R-Ext2 init failed");
+
+  // Deselect all (redundant with begin but safe)
   digitalWrite(PIN_SPI_CS_TC_GAS_INTERNAL, HIGH);
   digitalWrite(PIN_SPI_CS_TC_FEEDSTOCK, HIGH);
   digitalWrite(PIN_SPI_CS_TC_VAPORIZER_WALL, HIGH);
@@ -73,31 +90,57 @@ void SensorManager::update() {
   _currentData.sensorStatus = 0;
 
   // Read TCs and check for errors
-  _currentData.tempGasInternal = _tcGasInternal->readCelsius();
+  // Helper to read TC and print error if any
+  auto readTc = [&](Adafruit_MAX31855 *tc, const char *name) -> float {
+    float t = tc->readCelsius();
+    if (isnan(t)) {
+      uint8_t err = tc->readError();
+      Serial.print("Error ");
+      Serial.print(name);
+      Serial.print(": 0x");
+      Serial.println(err, HEX);
+      return NAN;
+    }
+    // Also check for 0.0 which might be suspicious if all are 0
+    if (t == 0.0) {
+      // Check if it's a real 0 or an error that didn't return NAN (some old
+      // libs?)
+      uint8_t err = tc->readError();
+      if (err) {
+        Serial.print("Error (0.0) ");
+        Serial.print(name);
+        Serial.print(": 0x");
+        Serial.println(err, HEX);
+      }
+    }
+    return t;
+  };
+
+  _currentData.tempGasInternal = readTc(_tcGasInternal, "GasInt");
   if (isnan(_currentData.tempGasInternal))
     _currentData.sensorStatus |= ERR_TC_GAS_INTERNAL;
 
-  _currentData.tempFeedstock = _tcFeedstock->readCelsius();
+  _currentData.tempFeedstock = readTc(_tcFeedstock, "Feed");
   if (isnan(_currentData.tempFeedstock))
     _currentData.sensorStatus |= ERR_TC_FEEDSTOCK;
 
-  _currentData.tempVaporizerWall = _tcVaporizerWall->readCelsius();
+  _currentData.tempVaporizerWall = readTc(_tcVaporizerWall, "VapWall");
   if (isnan(_currentData.tempVaporizerWall))
     _currentData.sensorStatus |= ERR_TC_VAPORIZER_WALL;
 
-  _currentData.tempReactorInt1 = _tcReactorInt1->readCelsius();
+  _currentData.tempReactorInt1 = readTc(_tcReactorInt1, "R-Int1");
   if (isnan(_currentData.tempReactorInt1))
     _currentData.sensorStatus |= ERR_TC_REACTOR_INT_1;
 
-  _currentData.tempReactorInt2 = _tcReactorInt2->readCelsius();
+  _currentData.tempReactorInt2 = readTc(_tcReactorInt2, "R-Int2");
   if (isnan(_currentData.tempReactorInt2))
     _currentData.sensorStatus |= ERR_TC_REACTOR_INT_2;
 
-  _currentData.tempReactorExt1 = _tcReactorExt1->readCelsius();
+  _currentData.tempReactorExt1 = readTc(_tcReactorExt1, "R-Ext1");
   if (isnan(_currentData.tempReactorExt1))
     _currentData.sensorStatus |= ERR_TC_REACTOR_EXT_1;
 
-  _currentData.tempReactorExt2 = _tcReactorExt2->readCelsius();
+  _currentData.tempReactorExt2 = readTc(_tcReactorExt2, "R-Ext2");
   if (isnan(_currentData.tempReactorExt2))
     _currentData.sensorStatus |= ERR_TC_REACTOR_EXT_2;
 
