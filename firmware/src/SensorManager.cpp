@@ -31,7 +31,7 @@ void SensorManager::begin() {
   digitalWrite(PIN_SPI_CS_TC_REACTOR_EXT_2, HIGH);
 
   // Initialize ADCs
-  /* skipped for diagnostics
+  // Initialize ADCs
   if (!_adsMFC.begin(I2C_ADDR_ADS1115_MFC))
     // Serial.println("Failed: ADS MFC");
     ;
@@ -41,7 +41,6 @@ void SensorManager::begin() {
   if (!_adsH2.begin(I2C_ADDR_ADS1115_H2))
     // Serial.println("Failed: ADS H2");
     ;
-  */
 }
 
 void SensorManager::update() {
@@ -87,14 +86,14 @@ void SensorManager::update() {
   // --- Read ADCs with 0.5-4.5V scaling and Disconnect Detection ---
 
   // Helper to read voltage for diagnostics
-  /* Skipped for diagnostics
+  // --- Read ADCs with 0.5-4.5V scaling and Disconnect Detection ---
+
+  // Helper to read voltage for diagnostics
   auto getVolts = [&](Adafruit_ADS1115 &ads, int ch) -> float {
     return ads.computeVolts(ads.readADC_SingleEnded(ch));
   };
-  */
 
   // 1. Pressure
-  /*
   float pVolts = getVolts(_adsPressure, ADC_CH_PRESSURE);
   if (pVolts < 0.2) { // Disconnected (Floating/Pull-down) or Broken Wire
     _currentData.sensorStatus |= ERR_P_FEED;
@@ -108,13 +107,10 @@ void SensorManager::update() {
     else
       _currentData.pressureFeedBar = (pVolts - 0.5) * (PRESSURE_MAX_PSIG / 4.0);
   }
-  */
-  _currentData.pressureFeedBar = 0; // Default
 
   _currentData.pressureReactorBar = 0; // Placeholder
 
   // 2. Flow (MFC)
-  /*
   float fVolts = getVolts(_adsMFC, ADC_CH_MFC_FLOW_READ);
   if (fVolts < 0.2) {
     _currentData.sensorStatus |= ERR_MFC_FLOW;
@@ -127,11 +123,8 @@ void SensorManager::update() {
     else
       _currentData.flowRateSccm = (fVolts - 0.5) * (MFC_FLOW_MAX_SCCM / 4.0);
   }
-  */
-  _currentData.flowRateSccm = 0; // Default
 
   // 3. H2 Sensor
-  /*
   float hVolts = getVolts(_adsH2, ADC_CH_H2_SENSOR);
   if (hVolts < 0.2) {
     _currentData.sensorStatus |= ERR_H2_SENSOR;
@@ -144,8 +137,6 @@ void SensorManager::update() {
     else
       _currentData.h2ConcentrationPpm = (hVolts - 0.5) * (H2_MAX_PERCENT / 4.0);
   }
-  */
-  _currentData.h2ConcentrationPpm = 0; // Default
 }
 
 SensorData SensorManager::getLastReadings() { return _currentData; }

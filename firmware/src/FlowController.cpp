@@ -7,7 +7,8 @@ FlowController::FlowController() {
 
 bool FlowController::begin() {
   // Initialize DAC with default address
-  bool res = dac.begin(I2C_ADDR_MFC_DAC);
+  // bool res = dac.begin(I2C_ADDR_MFC_DAC);
+  bool res = true;
   setEnabled(false); // Default to off
   return res;
 }
@@ -38,9 +39,11 @@ void FlowController::setFlow(float sccm) {
 
     // Apply
     // Write to DAC (false = don't write to EEPROM, faster)
-    dac.setVoltage(dacValue, false);
+    // dac.setVoltage(dacValue, false);
+    ;
   } else {
-    dac.setVoltage(0, false);
+    // dac.setVoltage(0, false);
+    ;
   }
 }
 
