@@ -23,6 +23,10 @@ Command SerialComms::checkCommand() {
 
       if (!error) {
         const char *typeStr = doc["cmd"];
+        if (!typeStr) {
+          sendError("Missing 'cmd' field");
+          return cmd;
+        }
         if (strcmp(typeStr, "SET_TEMP") == 0) {
           cmd.type = CMD_SET_TEMP;
           cmd.zone = doc["zone"];

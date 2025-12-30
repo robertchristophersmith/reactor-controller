@@ -5,7 +5,6 @@
 #include <Arduino.h>
 #include <PID_v1.h>
 
-
 // Time Proportional Window Size (ms)
 #define WINDOW_SIZE 1000
 
@@ -13,7 +12,7 @@ class HeaterController {
 public:
   HeaterController();
   void begin();
-  void update(float tempGas, float tempVaporizer, float tempReactor);
+
   void setSetpoints(float spGas, float spVaporizer, float spReactor1,
                     float spReactor2);
   void update(float tempGas, float tempVaporizer, float tempReactor1,

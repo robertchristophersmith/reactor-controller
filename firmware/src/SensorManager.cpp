@@ -169,6 +169,7 @@ void SensorManager::update() {
 
 SensorData SensorManager::getLastReadings() { return _currentData; }
 
+/*
 float SensorManager::readScaled(Adafruit_ADS1115 &ads, int channel, float vMin,
                                 float vMax, float euMin, float euMax) {
   int16_t adc = ads.readADC_SingleEnded(channel);
@@ -181,3 +182,4 @@ float SensorManager::readScaled(Adafruit_ADS1115 &ads, int channel, float vMin,
 
   return euMin + (voltage - vMin) * (euMax - euMin) / (vMax - vMin);
 }
+*/

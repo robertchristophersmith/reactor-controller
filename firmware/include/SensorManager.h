@@ -7,6 +7,8 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <Wire.h>
+#include <stdint.h>
+
 
 struct SensorData {
   // Temperatures (Celsius)
@@ -67,8 +69,9 @@ private:
 
   SensorData _currentData;
 
-  float readScaled(Adafruit_ADS1115 &ads, int channel, float vMin, float vMax,
-                   float euMin, float euMax);
+  // float readScaled(Adafruit_ADS1115 &ads, int channel, float vMin, float
+  // vMax,
+  //                  float euMin, float euMax);
 };
 
 #endif
