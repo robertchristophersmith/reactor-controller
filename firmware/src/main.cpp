@@ -23,8 +23,8 @@ void setup() {
 
   // --- SPI TEST ---
   Serial.println("\n[TEST] SPI Loopback...");
-  pinMode(PIN_SPI_CS_TC_GAS_INTERNAL, OUTPUT); // Set at least one CS
-  digitalWrite(PIN_SPI_CS_TC_GAS_INTERNAL, HIGH);
+  pinMode(22, OUTPUT); // Set at least one CS
+  digitalWrite(22, HIGH);
 
   SPI.begin();
   SPI.setClockDivider(SPI_CLOCK_DIV16); // Moderate speed
