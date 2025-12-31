@@ -1,20 +1,13 @@
 #include "SensorManager.h"
 
 SensorManager::SensorManager() {
-  _tcGasInternal = new Adafruit_MAX31855(
-      PIN_SPI_SCK, PIN_SPI_CS_TC_GAS_INTERNAL, PIN_SPI_MISO);
-  _tcFeedstock =
-      new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_FEEDSTOCK, PIN_SPI_MISO);
-  _tcVaporizerWall = new Adafruit_MAX31855(
-      PIN_SPI_SCK, PIN_SPI_CS_TC_VAPORIZER_WALL, PIN_SPI_MISO);
-  _tcReactorInt1 = new Adafruit_MAX31855(
-      PIN_SPI_SCK, PIN_SPI_CS_TC_REACTOR_INT_1, PIN_SPI_MISO);
-  _tcReactorInt2 = new Adafruit_MAX31855(
-      PIN_SPI_SCK, PIN_SPI_CS_TC_REACTOR_INT_2, PIN_SPI_MISO);
-  _tcReactorExt1 = new Adafruit_MAX31855(
-      PIN_SPI_SCK, PIN_SPI_CS_TC_REACTOR_EXT_1, PIN_SPI_MISO);
-  _tcReactorExt2 = new Adafruit_MAX31855(
-      PIN_SPI_SCK, PIN_SPI_CS_TC_REACTOR_EXT_2, PIN_SPI_MISO);
+  _tcGasInternal = new Adafruit_MAX31855(PIN_SPI_CS_TC_GAS_INTERNAL);
+  _tcFeedstock = new Adafruit_MAX31855(PIN_SPI_CS_TC_FEEDSTOCK);
+  _tcVaporizerWall = new Adafruit_MAX31855(PIN_SPI_CS_TC_VAPORIZER_WALL);
+  _tcReactorInt1 = new Adafruit_MAX31855(PIN_SPI_CS_TC_REACTOR_INT_1);
+  _tcReactorInt2 = new Adafruit_MAX31855(PIN_SPI_CS_TC_REACTOR_INT_2);
+  _tcReactorExt1 = new Adafruit_MAX31855(PIN_SPI_CS_TC_REACTOR_EXT_1);
+  _tcReactorExt2 = new Adafruit_MAX31855(PIN_SPI_CS_TC_REACTOR_EXT_2);
 }
 
 void SensorManager::begin() {
