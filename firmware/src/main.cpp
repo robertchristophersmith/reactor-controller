@@ -1,188 +1,109 @@
-#include "HeaterController.h"
-#include "SensorManager.h"
-#include "SerialComms.h"
-#include "WeightedAverage.h"
-#include "config.h"
 #include <Arduino.h>
+#include <SPI.h>
+#include <Wire.h>
 
-// --- Global Objects ---
-SensorManager sensors;
-HeaterController heaters;
-FlowController flow;
-SerialComms comms;
-WeightedAverage wAvg1; // Zone 1
-WeightedAverage wAvg2; // Zone 2
+// Config
+#define PIN_SPI_SCK 52
+#define PIN_SPI_MISO 50
+#define PIN_SPI_MOSI 51
 
-// --- State Management ---
-ControlState currentState = STATE_STANDBY;
-unsigned long lastLoopTime = 0;
-unsigned long lastTelemetryTime = 0;
-unsigned long lastHeartbeatTime = 0;
-unsigned long startTime = 0;
-
-const unsigned long HEARTBEAT_TIMEOUT = 5000; // 5 Seconds safety timeout
-
-// --- Forward Declarations ---
-void updateFSM(SensorData &data);
-void checkSafety(SensorData &data);
+// CS Pins to test
+const int csPins[] = {22, 23, 24, 25, 26, 27, 28};
+const int numCsPins = 7;
 
 void setup() {
-  Serial.begin(SERIAL_BAUD);
-  // while (!Serial)
-  //   delay(10); // Wait for USB
-  delay(1000); // Give time for Serial to stabilize
-  Serial.println("=== BOOT START ===");
-  Serial.println("BOOT");
+  Serial.begin(115200);
+  while (!Serial)
+    delay(10);
+  Serial.println("\n\n=== ARDUINO HARDWARE DIAGNOSTIC ===");
+  Serial.println("1. SPI Loopback Test (Requires Jumper Pin 50 <-> Pin 51)");
+  Serial.println("2. I2C Bus Scan");
+  Serial.println("3. Toggle CS Pins (Check for stuck pins)");
+  Serial.println("=======================================");
 
-  sensors.begin();
-  Serial.println("Sensors init done");
+  // --- SPI TEST ---
+  Serial.println("\n[TEST] SPI Loopback...");
+  pinMode(PIN_SPI_CS_TC_GAS_INTERNAL, OUTPUT); // Set at least one CS
+  digitalWrite(PIN_SPI_CS_TC_GAS_INTERNAL, HIGH);
 
-  heaters.begin();
-  Serial.println("Heaters init done");
+  SPI.begin();
+  SPI.setClockDivider(SPI_CLOCK_DIV16); // Moderate speed
 
-  flow.begin();
-  Serial.println("Flow init done");
+  byte testByte = 0xAB; // Pattern 10101011
+  byte received = SPI.transfer(testByte);
 
-  comms.begin();
-  Serial.println("Comms init done");
+  Serial.print("Sent: 0x");
+  Serial.print(testByte, HEX);
+  Serial.print(" Received: 0x");
+  Serial.println(received, HEX);
 
-  startTime = millis();
-  lastHeartbeatTime = millis();
+  if (received == testByte) {
+    Serial.println("RESULT: PASS - SPI Port is healthy.");
+  } else if (received == 0x00) {
+    Serial.println("RESULT: FAIL - Received 0x00. MISO is stuck LOW or "
+                   "loopback wire missing.");
+  } else if (received == 0xFF) {
+    Serial.println("RESULT: FAIL - Received 0xFF. MISO is stuck HIGH.");
+  } else {
+    Serial.println("RESULT: FAIL - Data mismatch (Noise/Speed issue?).");
+  }
 
-  // Initial state
-  currentState = STATE_STANDBY;
+  // --- I2C TEST ---
+  Serial.println("\n[TEST] I2C Bus Scan...");
+  Wire.begin();
+  int nDevices = 0;
+  for (byte address = 1; address < 127; address++) {
+    Wire.beginTransmission(address);
+    byte error = Wire.endTransmission();
+    if (error == 0) {
+      Serial.print("I2C Device found at 0x");
+      if (address < 16)
+        Serial.print("0");
+      Serial.print(address, HEX);
+      Serial.println(" !");
+      nDevices++;
+    } else if (error == 4) {
+      Serial.print("Unknown error at 0x");
+      if (address < 16)
+        Serial.print("0");
+      Serial.println(address, HEX);
+    }
+  }
+  if (nDevices == 0)
+    Serial.println("No I2C devices found.");
+  else
+    Serial.println("I2C Scan Complete.");
+
+  // --- CS PIN TEST ---
+  Serial.println("\n[TEST] Toggling CS Pins 22-28 (Active LOW)...");
+  Serial.println("Pins will toggle every 100ms. Check voltages.");
+  for (int i = 0; i < numCsPins; i++) {
+    pinMode(csPins[i], OUTPUT);
+    digitalWrite(csPins[i], HIGH);
+  }
 }
 
 void loop() {
-  unsigned long now = millis();
-
-  // 1. Process Serial Commands (As fast as possible)
-  Command cmd = comms.checkCommand();
-  if (cmd.type != CMD_NONE) {
-    lastHeartbeatTime = now; // Reset watchdog
-
-    switch (cmd.type) {
-    case CMD_SET_TEMP:
-      if (cmd.zone == 0)
-        heaters.setSetpoints(cmd.value, heaters.getSetpointVaporizer(),
-                             heaters.getSetpointReactor1(),
-                             heaters.getSetpointReactor2());
-      if (cmd.zone == 1)
-        heaters.setSetpoints(heaters.getSetpointGas(), cmd.value,
-                             heaters.getSetpointReactor1(),
-                             heaters.getSetpointReactor2());
-      if (cmd.zone == 2)
-        heaters.setSetpoints(heaters.getSetpointGas(),
-                             heaters.getSetpointVaporizer(), cmd.value,
-                             heaters.getSetpointReactor2());
-      if (cmd.zone == 3)
-        heaters.setSetpoints(heaters.getSetpointGas(),
-                             heaters.getSetpointVaporizer(),
-                             heaters.getSetpointReactor1(), cmd.value);
-      break;
-    case CMD_SET_STATE:
-      currentState = (ControlState)cmd.state;
-      break;
-    case CMD_SET_FLOW:
-      flow.setFlow(cmd.value);
-      break;
-    case CMD_HEARTBEAT:
-      break;
-    case CMD_NONE:
-      break;
-    }
+  // Continuously toggle CS pins so user can test with multimeter/LED
+  for (int i = 0; i < numCsPins; i++) {
+    digitalWrite(csPins[i], LOW);
   }
-
-  // 2. Fixed Interval Control Loop (10Hz)
-  if (now - lastLoopTime >= LOOP_INTERVAL_MS) {
-    lastLoopTime = now;
-
-    // A. Read Sensors
-    sensors.update();
-    SensorData data = sensors.getLastReadings();
-
-    // B. Check Safety (Hard Limits)
-    checkSafety(data);
-
-    // C. Update FSM (Logic for each state)
-    updateFSM(data);
-
-    // Calc Weighted PVs (Simplest: 50/50 split of Int/Ext)
-    float instant1 = (data.tempReactorInt1 + data.tempReactorExt1) / 2.0;
-    float instant2 = (data.tempReactorInt2 + data.tempReactorExt2) / 2.0;
-
-    wAvg1.add(instant1);
-    wAvg2.add(instant2);
-
-    float pv1 = wAvg1.getAverage();
-    float pv2 = wAvg2.getAverage();
-
-    // D. Update Heaters (PID calculation)
-    heaters.update(data.tempGasInternal, data.tempVaporizerWall, pv1, pv2);
-
-    // E. Telemetry (1Hz)
-    if (now - lastTelemetryTime >= 1000) {
-      lastTelemetryTime = now;
-      comms.sendTelemetry(data, heaters, flow, currentState,
-                          (now - startTime) / 1000);
-    }
+  delay(100);
+  for (int i = 0; i < numCsPins; i++) {
+    digitalWrite(csPins[i], HIGH);
   }
+  delay(100);
 
-  // 3. Watchdog Check
-  if (now - lastHeartbeatTime > HEARTBEAT_TIMEOUT) {
-    if (currentState != STATE_FAULT && currentState != STATE_ALARM &&
-        currentState != STATE_STANDBY) {
-      currentState = STATE_ALARM;
-      comms.sendError("HEARTBEAT_TIMEOUT");
-    }
+  // Continuous SPI test
+  byte test = 0x55;
+  byte rx = SPI.transfer(test);
+  if (rx != test) {
+    // Only print on failure to avoid spam, but print occasionally to show it's
+    // alive
   }
-}
-
-void checkSafety(SensorData &data) {
-  // Immediate overrides regardless of state
-  if (data.tempGasInternal > MAX_TEMP_C_GAS ||
-      data.tempReactorInt1 > MAX_TEMP_C_REACTOR ||
-      data.pressureReactorBar > MAX_PRESSURE_BAR) {
-
-    if (currentState != STATE_FAULT) {
-      currentState = STATE_FAULT;
-      comms.sendError("SAFETY_LIMIT_EXCEEDED");
-    }
-  }
-
-  if (!data.sensorsHealthy) {
-    if (currentState != STATE_FAULT) {
-      currentState = STATE_FAULT;
-      comms.sendError("SENSOR_FAILURE");
-    }
-  }
-}
-
-void updateFSM(SensorData &data) {
-  switch (currentState) {
-  case STATE_STANDBY:
-    heaters.setEnabled(false);
-    flow.setEnabled(false);
-    break;
-
-  case STATE_WARMUP:
-    heaters.setEnabled(true);
-    flow.setEnabled(true);
-    break;
-
-  case STATE_WORKING:
-    heaters.setEnabled(true);
-    flow.setEnabled(true);
-    break;
-
-  case STATE_ALARM:
-    heaters.setEnabled(false);
-    flow.setEnabled(false);
-    break;
-
-  case STATE_FAULT:
-    heaters.setEnabled(false);
-    flow.setEnabled(false);
-    break;
+  static int count = 0;
+  if (count++ > 20) {
+    Serial.print("."); // Heartbeat
+    count = 0;
   }
 }
