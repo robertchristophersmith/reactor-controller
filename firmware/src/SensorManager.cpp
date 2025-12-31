@@ -14,6 +14,8 @@ void SensorManager::begin() {
   // Initialize SPI TCs - Library handles SPI begin internally but good practice
   // to ensure pin modes. Actually, for hardware SPI, we MUST call SPI.begin()
   SPI.begin();
+  // Slow down SPI to ~250kHz (16MHz / 64) for stability check
+  SPI.setClockDivider(SPI_CLOCK_DIV64);
 
   // Initialize CS Pins
   pinMode(PIN_SPI_CS_TC_GAS_INTERNAL, OUTPUT);
@@ -26,20 +28,16 @@ void SensorManager::begin() {
 
   // Deselect all
   // Initialize TC instances
+  // Initialize TC instances
   if (!_tcGasInternal->begin())
     Serial.println("TC Gas Int init failed");
-  if (!_tcFeedstock->begin())
-    Serial.println("TC Feed init failed");
-  if (!_tcVaporizerWall->begin())
-    Serial.println("TC Vap init failed");
-  if (!_tcReactorInt1->begin())
-    Serial.println("TC R-Int1 init failed");
-  if (!_tcReactorInt2->begin())
-    Serial.println("TC R-Int2 init failed");
-  if (!_tcReactorExt1->begin())
-    Serial.println("TC R-Ext1 init failed");
-  if (!_tcReactorExt2->begin())
-    Serial.println("TC R-Ext2 init failed");
+  // Disable others for debugging
+  // if (!_tcFeedstock->begin()) Serial.println("TC Feed init failed");
+  // if (!_tcVaporizerWall->begin()) Serial.println("TC Vap init failed");
+  // if (!_tcReactorInt1->begin()) Serial.println("TC R-Int1 init failed");
+  // if (!_tcReactorInt2->begin()) Serial.println("TC R-Int2 init failed");
+  // if (!_tcReactorExt1->begin()) Serial.println("TC R-Ext1 init failed");
+  // if (!_tcReactorExt2->begin()) Serial.println("TC R-Ext2 init failed");
 
   // Deselect all (redundant with begin but safe)
   digitalWrite(PIN_SPI_CS_TC_GAS_INTERNAL, HIGH);
@@ -128,29 +126,13 @@ void SensorManager::update() {
   if (isnan(_currentData.tempGasInternal))
     _currentData.sensorStatus |= ERR_TC_GAS_INTERNAL;
 
-  _currentData.tempFeedstock = readTc(_tcFeedstock, "Feed");
-  if (isnan(_currentData.tempFeedstock))
-    _currentData.sensorStatus |= ERR_TC_FEEDSTOCK;
-
-  _currentData.tempVaporizerWall = readTc(_tcVaporizerWall, "VapWall");
-  if (isnan(_currentData.tempVaporizerWall))
-    _currentData.sensorStatus |= ERR_TC_VAPORIZER_WALL;
-
-  _currentData.tempReactorInt1 = readTc(_tcReactorInt1, "R-Int1");
-  if (isnan(_currentData.tempReactorInt1))
-    _currentData.sensorStatus |= ERR_TC_REACTOR_INT_1;
-
-  _currentData.tempReactorInt2 = readTc(_tcReactorInt2, "R-Int2");
-  if (isnan(_currentData.tempReactorInt2))
-    _currentData.sensorStatus |= ERR_TC_REACTOR_INT_2;
-
-  _currentData.tempReactorExt1 = readTc(_tcReactorExt1, "R-Ext1");
-  if (isnan(_currentData.tempReactorExt1))
-    _currentData.sensorStatus |= ERR_TC_REACTOR_EXT_1;
-
-  _currentData.tempReactorExt2 = readTc(_tcReactorExt2, "R-Ext2");
-  if (isnan(_currentData.tempReactorExt2))
-    _currentData.sensorStatus |= ERR_TC_REACTOR_EXT_2;
+  // Manually disable others for now to test isolation
+  _currentData.tempFeedstock = 0;     // readTc(_tcFeedstock, "Feed");
+  _currentData.tempVaporizerWall = 0; // readTc(_tcVaporizerWall, "VapWall");
+  _currentData.tempReactorInt1 = 0;   // readTc(_tcReactorInt1, "R-Int1");
+  _currentData.tempReactorInt2 = 0;   // readTc(_tcReactorInt2, "R-Int2");
+  _currentData.tempReactorExt1 = 0;   // readTc(_tcReactorExt1, "R-Ext1");
+  _currentData.tempReactorExt2 = 0;   // readTc(_tcReactorExt2, "R-Ext2");
 
   // Global health check based on critical sensors
   if ((_currentData.sensorStatus & ERR_TC_GAS_INTERNAL) ||
