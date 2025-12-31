@@ -14,8 +14,8 @@ void SensorManager::begin() {
   // Initialize SPI TCs - Library handles SPI begin internally but good practice
   // to ensure pin modes. Actually, for hardware SPI, we MUST call SPI.begin()
   SPI.begin();
-  // Slow down SPI to ~250kHz (16MHz / 64) for stability check
-  SPI.setClockDivider(SPI_CLOCK_DIV64);
+  // Slow down SPI to ~500kHz (16MHz / 32) for stability
+  SPI.setClockDivider(SPI_CLOCK_DIV32);
 
   // Initialize CS Pins
   pinMode(PIN_SPI_CS_TC_GAS_INTERNAL, OUTPUT);
