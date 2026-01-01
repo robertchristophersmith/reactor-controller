@@ -11,13 +11,10 @@ SensorManager::SensorManager() {
 }
 
 void SensorManager::begin() {
-  // Initialize SPI TCs - Library handles SPI begin internally but good practice
-  // to ensure pin modes. Actually, for hardware SPI, we MUST call SPI.begin()
-  SPI.begin();
-  // Slow down SPI to ~500kHz (16MHz / 32) for stability
-  SPI.setClockDivider(SPI_CLOCK_DIV32);
-
-  // Initialize CS Pins
+  // --- SPI CS INITIALIZATION ---
+  // CRITICAL: We must initialize ALL CS pins to OUTPUT and HIGH (Deselected)
+  // *before* starting SPI or accessing any device. If we don't, floating pins
+  // might cause multiple devices to talk at once (Bus Contention).
   pinMode(PIN_SPI_CS_TC_GAS_INTERNAL, OUTPUT);
   pinMode(PIN_SPI_CS_TC_FEEDSTOCK, OUTPUT);
   pinMode(PIN_SPI_CS_TC_VAPORIZER_WALL, OUTPUT);
@@ -25,6 +22,19 @@ void SensorManager::begin() {
   pinMode(PIN_SPI_CS_TC_REACTOR_INT_2, OUTPUT);
   pinMode(PIN_SPI_CS_TC_REACTOR_EXT_1, OUTPUT);
   pinMode(PIN_SPI_CS_TC_REACTOR_EXT_2, OUTPUT);
+
+  digitalWrite(PIN_SPI_CS_TC_GAS_INTERNAL, HIGH);
+  digitalWrite(PIN_SPI_CS_TC_FEEDSTOCK, HIGH);
+  digitalWrite(PIN_SPI_CS_TC_VAPORIZER_WALL, HIGH);
+  digitalWrite(PIN_SPI_CS_TC_REACTOR_INT_1, HIGH);
+  digitalWrite(PIN_SPI_CS_TC_REACTOR_INT_2, HIGH);
+  digitalWrite(PIN_SPI_CS_TC_REACTOR_EXT_1, HIGH);
+  digitalWrite(PIN_SPI_CS_TC_REACTOR_EXT_2, HIGH);
+
+  // Initialize Hardware SPI
+  SPI.begin();
+  // Slow down SPI to ~500kHz (16MHz / 32) for stability
+  SPI.setClockDivider(SPI_CLOCK_DIV32);
 
   // Deselect all
   // Initialize TC instances
