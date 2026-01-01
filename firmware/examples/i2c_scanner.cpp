@@ -8,6 +8,9 @@ void setup() {
   // on a shorted or stuck bus.
   Wire.setWireTimeout(3000, true);
 
+  // Lower clock speed to 10kHz to help with long wires or poor signal
+  Wire.setClock(10000);
+
   Serial.begin(115200);
   while (!Serial)
     ;
