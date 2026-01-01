@@ -65,8 +65,20 @@ void SensorManager::begin() {
   // Initialize Wire manually to set timeout to prevent hangs
   Wire.begin();
   // Set timeout to 3000us (3ms) and reset_on_timeout=true
-  // This prevents infinite hanging if the bus is stuck or missing
   Wire.setWireTimeout(3000, true);
+
+  // --- I2C SCANNER ---
+  Serial.println("--- I2C Scanner Start ---");
+  for (byte i = 1; i < 127; i++) {
+    Wire.beginTransmission(i);
+    if (Wire.endTransmission() == 0) {
+      Serial.print("I2C Device found at 0x");
+      if (i < 16)
+        Serial.print("0");
+      Serial.println(i, HEX);
+    }
+  }
+  Serial.println("--- I2C Scanner End ---");
 
   Serial.println("Init: MFC ADS1115...");
   if (!_adsMFC.begin(I2C_ADDR_ADS1115_MFC)) {
