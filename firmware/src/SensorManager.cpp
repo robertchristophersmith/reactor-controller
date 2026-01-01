@@ -60,15 +60,14 @@ void SensorManager::begin() {
 
   // Initialize ADCs
   // Initialize ADCs
-  Serial.println("Init: ADCs starting... (DISABLED by User Request)");
+  Serial.println("Init: ADCs starting...");
 
   // Initialize Wire manually to set timeout to prevent hangs
-  // Wire.begin();
+  Wire.begin();
   // Set timeout to 3000us (3ms) and reset_on_timeout=true
   // This prevents infinite hanging if the bus is stuck or missing
-  // Wire.setWireTimeout(3000, true);
+  Wire.setWireTimeout(3000, true);
 
-  /*
   Serial.println("Init: MFC ADS1115...");
   if (!_adsMFC.begin(I2C_ADDR_ADS1115_MFC)) {
     Serial.println("Failed: ADS MFC");
@@ -89,7 +88,6 @@ void SensorManager::begin() {
   } else {
     Serial.println("OK: ADS H2");
   }
-  */
 
   Serial.println("Init: Sensors Done");
 }
@@ -136,13 +134,17 @@ void SensorManager::update() {
   if (isnan(_currentData.tempGasInternal))
     _currentData.sensorStatus |= ERR_TC_GAS_INTERNAL;
 
-  // Manually disable others for now to test isolation
-  _currentData.tempFeedstock = 0;     // readTc(_tcFeedstock, "Feed");
-  _currentData.tempVaporizerWall = 0; // readTc(_tcVaporizerWall, "VapWall");
-  _currentData.tempReactorInt1 = 0;   // readTc(_tcReactorInt1, "R-Int1");
-  _currentData.tempReactorInt2 = 0;   // readTc(_tcReactorInt2, "R-Int2");
-  _currentData.tempReactorExt1 = 0;   // readTc(_tcReactorExt1, "R-Ext1");
-  _currentData.tempReactorExt2 = 0;   // readTc(_tcReactorExt2, "R-Ext2");
+  // Read enabled sensors
+  _currentData.tempFeedstock = readTc(_tcFeedstock, "Feed");
+  _currentData.tempVaporizerWall = readTc(_tcVaporizerWall, "VapWall");
+  _currentData.tempReactorInt1 = readTc(_tcReactorInt1, "R-Int1");
+  _currentData.tempReactorExt2 = readTc(_tcReactorExt2, "R-Ext2");
+
+  // Disabled Sensors (Diagnostics showed hardware failure)
+  _currentData.tempReactorInt2 =
+      0; // readTc(_tcReactorInt2, "R-Int2"); // ERROR: Open Circuit
+  _currentData.tempReactorExt1 =
+      0; // readTc(_tcReactorExt1, "R-Ext1"); // ERROR: Open Circuit/Garbage
 
   // Global health check based on critical sensors
   if ((_currentData.sensorStatus & ERR_TC_GAS_INTERNAL) ||
@@ -153,7 +155,6 @@ void SensorManager::update() {
   }
 
   // --- Read ADCs with 0.5-4.5V scaling and Disconnect Detection ---
-  /* Skipped for now to prevent loop hang due to I2C instability
   // Helper: Check if I2C device is alive before reading to prevent hanging
   auto isConnected = [](uint8_t addr) -> bool {
     Wire.beginTransmission(addr);
@@ -228,13 +229,10 @@ void SensorManager::update() {
     _currentData.sensorStatus |= ERR_H2_SENSOR;
     _currentData.h2ConcentrationPpm = 0;
   }
-  */
 
-  // Default failure values so loop continues
-  _currentData.pressureFeedBar = 0;
+  // Default failure values so loop continues (Modified to only set Reactor
+  // Pressure)
   _currentData.pressureReactorBar = 0;
-  _currentData.flowRateSccm = 0;
-  _currentData.h2ConcentrationPpm = 0;
 }
 
 SensorData SensorManager::getLastReadings() { return _currentData; }
