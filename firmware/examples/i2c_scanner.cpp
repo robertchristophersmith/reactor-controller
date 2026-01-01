@@ -3,10 +3,21 @@
 
 void setup() {
   Wire.begin();
+
+  // Set timeout to 3000us (3ms) and reset_on_timeout=true to prevent hanging
+  // on a shorted or stuck bus.
+  Wire.setWireTimeout(3000, true);
+
   Serial.begin(115200);
   while (!Serial)
     ;
   Serial.println("\nI2C Scanner");
+
+  // Print status of SDA/SCL pins if possible (debugging help)
+  Serial.print("SDA Pin State: ");
+  Serial.println(digitalRead(20)); // Mega SDA
+  Serial.print("SCL Pin State: ");
+  Serial.println(digitalRead(21)); // Mega SCL
 }
 
 void loop() {
