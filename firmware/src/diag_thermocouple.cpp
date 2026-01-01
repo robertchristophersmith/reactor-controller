@@ -9,8 +9,12 @@
 #define PIN_SPI_SCK 52
 #define PIN_SPI_MISO 50
 
-// Chip Select to Test
-// Pin 22 - Gas Preheat (User suspects this is MAX31855 or MAX6675)
+// Chip Selects
+// We must DESELECT (Set HIGH) all other devices to prevent bus contention
+const int CS_PINS[] = {22, 23, 24, 25, 26, 27, 28};
+const int NUM_CS = 7;
+
+// Pin to test
 #define PIN_SPI_CS_TEST 22
 
 void setup() {
@@ -18,21 +22,27 @@ void setup() {
   while (!Serial)
     delay(10);
 
-  Serial.println("\n\n--- MAX6675/31855 DIAGNOSTIC TOOL ---");
-  Serial.print("Testing CS Pin: ");
+  Serial.println("\n\n--- MAX6675/31855 DIAGNOSTIC TOOL v2 ---");
+  Serial.println("Initializing ALL CS pins to HIGH (Disabled)...");
+
+  // Initialize ALL CS pins to OUTPUT HIGH to shut them up
+  for (int i = 0; i < NUM_CS; i++) {
+    pinMode(CS_PINS[i], OUTPUT);
+    digitalWrite(CS_PINS[i], HIGH);
+  }
+
+  Serial.print("Testing Target CS Pin: ");
   Serial.println(PIN_SPI_CS_TEST);
   Serial.print("SCK Pin: ");
   Serial.println(PIN_SPI_SCK);
   Serial.print("MISO Pin: ");
   Serial.println(PIN_SPI_MISO);
 
-  // Configure Pins manually for bit-banging
-  pinMode(PIN_SPI_CS_TEST, OUTPUT);
+  // Configure SPI Pins
   pinMode(PIN_SPI_SCK, OUTPUT);
-  pinMode(PIN_SPI_MISO, INPUT);
+  pinMode(PIN_SPI_MISO, INPUT); // Ensure MISO is Input
 
-  digitalWrite(PIN_SPI_CS_TEST, HIGH); // Deselect
-  digitalWrite(PIN_SPI_SCK, LOW);      // Idle Low
+  digitalWrite(PIN_SPI_SCK, LOW); // Idle Low
 }
 
 uint32_t spiread32() {
@@ -74,18 +84,13 @@ void loop() {
   Serial.println();
 
   // --- INTERPRET AS MAX6675 (16-bit) ---
-  // Frame: [Dummy][12-bit Temp][OC][ID][...unused 16 bits...]
-  // Wait, standard SPI read is MSB first.
-  // MAX6675 sends 16 bits. Our 32-bit read will have data in top 16 bits if
-  // chip only sends 16. But if chip tri-states after 16, lower 16 bits might be
-  // garbage or last bit state.
+  uint16_t raw16 = (raw >> 16) & 0xFFFF; // Look at top 16 bits
+  // Note: if 6675, bits 0-15 might be last bit repeated or Z.
 
-  uint16_t raw16 = (raw >> 16) & 0xFFFF;
   Serial.print("Assuming MAX6675 (Top 16 bits): 0x");
   Serial.println(raw16, HEX);
-
   if (raw16 & 0x4) {
-    Serial.println("  -> MAX6675 Input Open (Thermocouple Broken)");
+    Serial.println("  -> MAX6675 Input Open");
   } else {
     uint16_t tempRaw = (raw16 >> 3) & 0xFFF;
     float tempC = tempRaw * 0.25;
@@ -95,29 +100,34 @@ void loop() {
   }
 
   // --- INTERPRET AS MAX31855 (32-bit) ---
-  // Frame: [Sign][13-bit Temp][Reserved][Fault][Res][IntSign][11-bit
-  // Int][Res][SCV][SCG][OC]
   Serial.println("Assuming MAX31855 (Full 32 bits):");
 
   // Extract Data
-  int32_t temp31855 = (raw >> 18) & 0x3FFF; // 14 bits (sign + 13 data)
-  // Sign extend if needed (if 14th bit is 1)
+  int32_t temp31855 = (raw >> 18) & 0x3FFF; // 14 bits
   if (temp31855 & 0x2000)
-    temp31855 |= 0xFFFFC000;
+    temp31855 |= 0xFFFFC000; // Sign extend
 
   float tempC_31855 = temp31855 * 0.25;
-  Serial.print("  -> MAX31855 Probe Temp: ");
+  Serial.print("  -> Probe Temp: ");
   Serial.print(tempC_31855);
   Serial.println(" C");
 
+  int32_t internalRaw = (raw >> 4) & 0xFFF; // 12 bits
+  if (internalRaw & 0x800)
+    internalRaw |= 0xFFFFF000;
+  float internalC = internalRaw * 0.0625;
+  Serial.print("  -> Internal Temp: ");
+  Serial.print(internalC);
+  Serial.println(" C");
+
   if (raw & 0x7) {
-    Serial.print("  -> FAULTS DETECTED: ");
+    Serial.print("  -> FAULTS: ");
     if (raw & 0x1)
       Serial.print("[Open Circuit] ");
     if (raw & 0x2)
-      Serial.print("[Short to GND] ");
+      Serial.print("[Short GND] ");
     if (raw & 0x4)
-      Serial.print("[Short to VCC] ");
+      Serial.print("[Short VCC] ");
     Serial.println();
   }
 
