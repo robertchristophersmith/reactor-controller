@@ -19,12 +19,11 @@
 #define PIN_SPI_MISO 50
 #define PIN_SPI_CS_TC_GAS_INTERNAL 22   // Gas Preheat
 #define PIN_SPI_CS_TC_VAPORIZER_WALL 23 // Vaporizer Wall
-#define PIN_SPI_CS_TC_REACTOR_EXT_1 24  // Reactor Zone 1 External
-#define PIN_SPI_CS_TC_REACTOR_EXT_2 25  // Reactor Zone 2 External
-#define PIN_SPI_CS_TC_REACTOR_INT_1 26  // Reactor Zone 1 Internal
-#define PIN_SPI_CS_TC_REACTOR_INT_2 27  // Reactor Zone 2 Internal
-#define PIN_SPI_CS_TC_FEEDSTOCK                                                \
-  28 // Feedstock (Moved to 28, previously used by Ext2)
+#define PIN_SPI_CS_TC_REACTOR_EXT_1 24  // Reactor Zone 1 (Top) External
+#define PIN_SPI_CS_TC_REACTOR_INT_1 25  // Reactor Zone 1 (Top) Internal
+#define PIN_SPI_CS_TC_REACTOR_EXT_2 26  // Reactor Zone 2 (Bottom) External
+#define PIN_SPI_CS_TC_REACTOR_INT_2 27  // Reactor Zone 2 (Bottom) Internal
+#define PIN_SPI_CS_TC_FEEDSTOCK 28      // Feedstock
 
 // --- I2C Bus (ADS1115, MCP4725) ---
 // Hardware I2C: SDA=20, SCL=21

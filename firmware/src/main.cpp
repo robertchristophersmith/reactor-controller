@@ -121,9 +121,11 @@ void loop() {
     // C. Update FSM (Logic for each state)
     updateFSM(data);
 
-    // Calc Weighted PVs (Simplest: 50/50 split of Int/Ext)
-    float instant1 = (data.tempReactorInt1 + data.tempReactorExt1) / 2.0;
-    float instant2 = (data.tempReactorInt2 + data.tempReactorExt2) / 2.0;
+    // Calc Weighted PVs (70% Internal / 30% External)
+    float instant1 =
+        (data.tempReactorInt1 * 0.7) + (data.tempReactorExt1 * 0.3);
+    float instant2 =
+        (data.tempReactorInt2 * 0.7) + (data.tempReactorExt2 * 0.3);
 
     wAvg1.add(instant1);
     wAvg2.add(instant2);

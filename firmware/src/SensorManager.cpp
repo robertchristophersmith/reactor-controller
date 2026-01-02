@@ -143,14 +143,11 @@ void SensorManager::update() {
   // Read enabled sensors
   _currentData.tempFeedstock = readTc(_tcFeedstock, "Feed");
   _currentData.tempVaporizerWall = readTc(_tcVaporizerWall, "VapWall");
+
+  _currentData.tempReactorExt1 = readTc(_tcReactorExt1, "R-Ext1");
   _currentData.tempReactorInt1 = readTc(_tcReactorInt1, "R-Int1");
   _currentData.tempReactorExt2 = readTc(_tcReactorExt2, "R-Ext2");
-
-  // Disabled Sensors (Diagnostics showed hardware failure)
-  _currentData.tempReactorInt2 =
-      0; // readTc(_tcReactorInt2, "R-Int2"); // ERROR: Open Circuit
-  _currentData.tempReactorExt1 =
-      0; // readTc(_tcReactorExt1, "R-Ext1"); // ERROR: Open Circuit/Garbage
+  _currentData.tempReactorInt2 = readTc(_tcReactorInt2, "R-Int2");
 
   // Global health check based on critical sensors
   if ((_currentData.sensorStatus & ERR_TC_GAS_INTERNAL) ||
