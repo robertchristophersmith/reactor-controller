@@ -26,6 +26,16 @@
 #define I2C_ADDR_ADS1115_H2 0x4A       // SDA - Hydrogen Sensor
 #define I2C_ADDR_MFC_DAC 0x62          // Default Adafruit Address
 
+// --- Stepper Motors (Modbus TTL) ---
+#define STEPPER_ADDR_FEEDSTOCK 1
+#define STEPPER_ADDR_AUX 2
+#define STEPPER_MODBUS_BAUD 9600
+// Registers
+#define REG_RUN_STOP 0x0100
+#define REG_CONTINUOUS_MODE 0x0101
+#define REG_ACCEL_DECEL 0x0104
+#define REG_SPEED 0x0105
+
 // --- ADS1115 Channel Map ---
 #define ADC_CH_MFC_FLOW_READ 0 // On ADS_MFC
 #define ADC_CH_PRESSURE 0      // On ADS_PRESSURE (0-30psig)

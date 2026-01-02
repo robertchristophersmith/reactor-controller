@@ -37,6 +37,11 @@ Command SerialComms::checkCommand() {
         } else if (strcmp(typeStr, "SET_FLOW") == 0) {
           cmd.type = CMD_SET_FLOW;
           cmd.value = doc["val"];
+          if (doc.containsKey("id")) {
+            cmd.zone = doc["id"];
+          } else {
+            cmd.zone = 0; // Default to MFC
+          }
         } else if (strcmp(typeStr, "HEARTBEAT") == 0) {
           cmd.type = CMD_HEARTBEAT;
         }
