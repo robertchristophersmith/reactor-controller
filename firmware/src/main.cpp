@@ -6,7 +6,6 @@
 #include "config.h"
 #include <Arduino.h>
 
-
 // --- Global Objects ---
 SensorManager sensors;
 HeaterController heaters;
@@ -35,26 +34,26 @@ void setup() {
   // while (!Serial)
   //   delay(10); // Wait for USB
   delay(1000); // Give time for Serial to stabilize
-  Serial.println("=== BOOT START ===");
-  Serial.println("BOOT");
+  // Serial.println("=== BOOT START ===");
+  // Serial.println("BOOT");
 
   sensors.begin();
-  Serial.println("Sensors init done");
+  // Serial.println("Sensors init done");
 
   heaters.begin();
-  Serial.println("Heaters init done");
+  // Serial.println("Heaters init done");
 
   flow.begin();
-  Serial.println("Flow init done");
+  // Serial.println("Flow init done");
 
   // Init Steppers
   Serial2.begin(STEPPER_MODBUS_BAUD);
   stepperFeed.begin(Serial2);
   stepperAux.begin(Serial2);
-  Serial.println("Steppers init done");
+  // Serial.println("Steppers init done");
 
   comms.begin();
-  Serial.println("Comms init done");
+  // Serial.println("Comms init done");
 
   startTime = millis();
   lastHeartbeatTime = millis();

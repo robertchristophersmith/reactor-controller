@@ -68,7 +68,7 @@ void SensorManager::begin() {
   Wire.setWireTimeout(3000, true);
 
   // DISABLE I2C SENSORS
-  Serial.println("Init: MFC ADS1115... DISABLED");
+  // Serial.println("Init: MFC ADS1115... DISABLED");
   /*
   if (!_adsMFC.begin(I2C_ADDR_ADS1115_MFC)) {
     Serial.println("Failed: ADS MFC");
@@ -77,7 +77,7 @@ void SensorManager::begin() {
   }
   */
 
-  Serial.println("Init: Pressure ADS1115... DISABLED");
+  // Serial.println("Init: Pressure ADS1115... DISABLED");
   /*
   if (!_adsPressure.begin(I2C_ADDR_ADS1115_PRESSURE)) {
     Serial.println("Failed: ADS Pressure");
@@ -86,7 +86,7 @@ void SensorManager::begin() {
   }
   */
 
-  Serial.println("Init: H2 ADS1115... DISABLED");
+  // Serial.println("Init: H2 ADS1115... DISABLED");
   /*
   if (!_adsH2.begin(I2C_ADDR_ADS1115_H2)) {
     Serial.println("Failed: ADS H2");
@@ -95,7 +95,7 @@ void SensorManager::begin() {
   }
   */
 
-  Serial.println("Init: Sensors Done");
+  // Serial.println("Init: Sensors Done");
 }
 
 void SensorManager::update() {
@@ -107,10 +107,10 @@ void SensorManager::update() {
     float t = tc->readCelsius();
     if (isnan(t)) {
       uint8_t err = tc->readError();
-      Serial.print("Error ");
-      Serial.print(name);
-      Serial.print(": 0x");
-      Serial.println(err, HEX);
+      // Serial.print("Error ");
+      // Serial.print(name);
+      // Serial.print(": 0x");
+      // Serial.println(err, HEX);
       return NAN;
     }
     // Also check for 0.0 which might be suspicious if all are 0
@@ -118,19 +118,19 @@ void SensorManager::update() {
       // Check internal temp logic
       float internal = tc->readInternal();
       if (internal == 0.0) {
-        Serial.print("Error Zero/Zero ");
-        Serial.print(name);
-        Serial.println(" (Check SPI MISO/Wiring)");
+        // Serial.print("Error Zero/Zero ");
+        // Serial.print(name);
+        // Serial.println(" (Check SPI MISO/Wiring)");
       } else {
         // Maybe it's just really cold? Unlikely to be exactly 0.00
       }
 
       uint8_t err = tc->readError();
       if (err) {
-        Serial.print("Error (0.0) ");
-        Serial.print(name);
-        Serial.print(": 0x");
-        Serial.println(err, HEX);
+        // Serial.print("Error (0.0) ");
+        // Serial.print(name);
+        // Serial.print(": 0x");
+        // Serial.println(err, HEX);
       }
     }
     return t;

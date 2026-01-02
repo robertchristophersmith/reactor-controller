@@ -9,7 +9,7 @@ FlowController::FlowController() {
 bool FlowController::begin() {
   // Initialize DAC with default address
   // Initialize DAC with default address
-  Serial.println("Init: MFC DAC... DISABLED");
+  // Serial.println("Init: MFC DAC... DISABLED");
   // bool res = dac.begin(I2C_ADDR_MFC_DAC);
   bool res = true;
 
