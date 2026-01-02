@@ -9,12 +9,15 @@ FlowController::FlowController() {
 bool FlowController::begin() {
   // Initialize DAC with default address
   // Initialize DAC with default address
-  Serial.println("Init: MFC DAC...");
-  bool res = dac.begin(I2C_ADDR_MFC_DAC);
+  Serial.println("Init: MFC DAC... DISABLED");
+  // bool res = dac.begin(I2C_ADDR_MFC_DAC);
+  bool res = true;
 
+  /*
   if (!res) {
     Serial.println("Failed: MFC DAC");
   }
+  */
 
   setEnabled(false); // Default to off
   // Even if failed, we return true to let main loop run (or handle error
@@ -50,11 +53,11 @@ void FlowController::setFlow(float sccm) {
     // Apply
     // Write to DAC (false = don't write to EEPROM, faster)
     if (_initialized) {
-      dac.setVoltage(dacValue, false);
+      // dac.setVoltage(dacValue, false);
     }
   } else {
     if (_initialized) {
-      dac.setVoltage(0, false);
+      // dac.setVoltage(0, false);
     }
   }
 }

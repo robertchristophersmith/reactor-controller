@@ -67,26 +67,33 @@ void SensorManager::begin() {
   // Set timeout to 3000us (3ms) and reset_on_timeout=true
   Wire.setWireTimeout(3000, true);
 
-  Serial.println("Init: MFC ADS1115...");
+  // DISABLE I2C SENSORS
+  Serial.println("Init: MFC ADS1115... DISABLED");
+  /*
   if (!_adsMFC.begin(I2C_ADDR_ADS1115_MFC)) {
     Serial.println("Failed: ADS MFC");
   } else {
     Serial.println("OK: ADS MFC");
   }
+  */
 
-  Serial.println("Init: Pressure ADS1115...");
+  Serial.println("Init: Pressure ADS1115... DISABLED");
+  /*
   if (!_adsPressure.begin(I2C_ADDR_ADS1115_PRESSURE)) {
     Serial.println("Failed: ADS Pressure");
   } else {
     Serial.println("OK: ADS Pressure");
   }
+  */
 
-  Serial.println("Init: H2 ADS1115...");
+  Serial.println("Init: H2 ADS1115... DISABLED");
+  /*
   if (!_adsH2.begin(I2C_ADDR_ADS1115_H2)) {
     Serial.println("Failed: ADS H2");
   } else {
     Serial.println("OK: ADS H2");
   }
+  */
 
   Serial.println("Init: Sensors Done");
 }
@@ -156,8 +163,10 @@ void SensorManager::update() {
   // --- Read ADCs with 0.5-4.5V scaling and Disconnect Detection ---
   // Helper: Check if I2C device is alive before reading to prevent hanging
   auto isConnected = [](uint8_t addr) -> bool {
-    Wire.beginTransmission(addr);
-    return (Wire.endTransmission() == 0);
+    // Disabling I2C Checks
+    return false;
+    // Wire.beginTransmission(addr);
+    // return (Wire.endTransmission() == 0);
   };
 
   // Helper to read voltage for diagnostics
@@ -168,6 +177,15 @@ void SensorManager::update() {
   };
 
   // 1. Pressure
+  _currentData.pressureFeedBar = 0.0; // Disabled
+
+  // 2. Flow (MFC)
+  _currentData.flowRateSccm = 0.0; // Disabled
+
+  // 3. H2 Sensor
+  _currentData.h2ConcentrationPpm = 0.0; // Disabled
+
+  /* I2C SENSORS DISABLED
   if (isConnected(I2C_ADDR_ADS1115_PRESSURE)) {
     float pVolts =
         getVolts(_adsPressure, ADC_CH_PRESSURE, I2C_ADDR_ADS1115_PRESSURE);
@@ -228,6 +246,7 @@ void SensorManager::update() {
     _currentData.sensorStatus |= ERR_H2_SENSOR;
     _currentData.h2ConcentrationPpm = 0;
   }
+  */
 
   // Default failure values so loop continues (Modified to only set Reactor
   // Pressure)
