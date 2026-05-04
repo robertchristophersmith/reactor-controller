@@ -102,6 +102,12 @@ void loop() {
       break;
     case CMD_HEARTBEAT:
       break;
+    case CMD_TARE_LOADCELL:
+      sensors.tareLoadCell();
+      break;
+    case CMD_CALIBRATE_LOADCELL:
+      sensors.calibrateLoadCell(cmd.value);
+      break;
     case CMD_NONE:
       break;
     }

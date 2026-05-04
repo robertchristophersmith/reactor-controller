@@ -44,6 +44,11 @@ Command SerialComms::checkCommand() {
           }
         } else if (strcmp(typeStr, "HEARTBEAT") == 0) {
           cmd.type = CMD_HEARTBEAT;
+        } else if (strcmp(typeStr, "TARE_LOADCELL") == 0) {
+          cmd.type = CMD_TARE_LOADCELL;
+        } else if (strcmp(typeStr, "CALIBRATE_LOADCELL") == 0) {
+          cmd.type = CMD_CALIBRATE_LOADCELL;
+          cmd.value = doc["val"];
         }
         return cmd; // Return immediately on full command
       } else {
@@ -80,6 +85,7 @@ void SerialComms::sendTelemetry(const SensorData &sensors,
   s["flow"] = sensors.flowRateSccm;
   s["h2"] = sensors.h2ConcentrationPpm;
   s["status"] = sensors.sensorStatus;
+  s["weight"] = sensors.weightKg;
 
   // Heaters
   JsonObject h = doc.createNestedObject("heaters");

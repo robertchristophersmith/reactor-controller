@@ -117,6 +117,12 @@ class Orchestrator:
     async def set_state(self, state: int):
         await serial_link.send_command({"cmd": "SET_STATE", "state": state})
 
+    async def send_tare(self):
+        await serial_link.send_command({"cmd": "TARE_LOADCELL"})
+
+    async def send_calibrate(self, value: float):
+        await serial_link.send_command({"cmd": "CALIBRATE_LOADCELL", "val": value})
+
     async def subscribe(self):
         q = asyncio.Queue()
         # Send history first

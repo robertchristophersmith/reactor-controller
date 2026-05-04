@@ -32,6 +32,10 @@
 #define I2C_ADDR_ADS1115_H2 0x4A       // SDA - Hydrogen Sensor
 #define I2C_ADDR_MFC_DAC 0x62          // Default Adafruit Address
 
+// --- Load Cell (HX711) ---
+#define PIN_HX711_SCK 2
+#define PIN_HX711_DT 3
+
 // --- Stepper Motors (Modbus TTL) ---
 #define STEPPER_ADDR_FEEDSTOCK 1
 #define STEPPER_ADDR_AUX 2

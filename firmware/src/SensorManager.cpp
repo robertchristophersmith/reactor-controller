@@ -95,6 +95,12 @@ void SensorManager::begin() {
   }
   */
 
+  // Initialize HX711
+  Serial.println("Init: HX711 Load Cell...");
+  _hx711.begin(PIN_HX711_DT, PIN_HX711_SCK);
+  _hx711.set_scale(); // Default scale
+  _hx711.tare();      // Auto-tare on startup
+
   // Serial.println("Init: Sensors Done");
 }
 
@@ -248,9 +254,30 @@ void SensorManager::update() {
   // Default failure values so loop continues (Modified to only set Reactor
   // Pressure)
   _currentData.pressureReactorBar = 0;
+
+  // Read Load Cell
+  if (_hx711.is_ready()) {
+    // get_units(times) returns average over 'times' readings divided by scale
+    _currentData.weightKg = _hx711.get_units(1);
+  }
 }
 
 SensorData SensorManager::getLastReadings() { return _currentData; }
+
+void SensorManager::tareLoadCell() {
+  if (_hx711.is_ready()) {
+    _hx711.tare();
+  }
+}
+
+void SensorManager::calibrateLoadCell(float knownWeight) {
+  if (knownWeight != 0 && _hx711.is_ready()) {
+    // get_value returns raw reading minus offset
+    long reading = _hx711.get_value(10); 
+    float scale = (float)reading / knownWeight;
+    _hx711.set_scale(scale);
+  }
+}
 
 /*
 float SensorManager::readScaled(Adafruit_ADS1115 &ads, int channel, float vMin,

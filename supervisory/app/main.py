@@ -43,6 +43,16 @@ async def set_flow(value: float):
     await orchestrator.send_flow(value)
     return {"status": "command_sent", "value": value}
 
+@app.post("/api/control/tare")
+async def tare_loadcell():
+    await orchestrator.send_tare()
+    return {"status": "command_sent"}
+
+@app.post("/api/control/calibrate")
+async def calibrate_loadcell(value: float):
+    await orchestrator.send_calibrate(value)
+    return {"status": "command_sent", "value": value}
+
 @app.get("/api/history")
 async def get_history():
     return list(orchestrator.live_buffer)

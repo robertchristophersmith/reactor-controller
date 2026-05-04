@@ -8,6 +8,7 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <stdint.h>
+#include <HX711.h>
 
 
 struct SensorData {
@@ -25,6 +26,7 @@ struct SensorData {
   float pressureReactorBar;
   float flowRateSccm;
   float h2ConcentrationPpm;
+  float weightKg;
 
   // Status
   // 0 = OK, Bit set = Fault
@@ -52,6 +54,9 @@ public:
   void update();
   SensorData getLastReadings();
 
+  void tareLoadCell();
+  void calibrateLoadCell(float knownWeight);
+
 private:
   // Thermocouple Objects
   Adafruit_MAX31855 *_tcGasInternal;
@@ -66,6 +71,8 @@ private:
   Adafruit_ADS1115 _adsMFC;
   Adafruit_ADS1115 _adsPressure;
   Adafruit_ADS1115 _adsH2;
+
+  HX711 _hx711;
 
   SensorData _currentData;
 
