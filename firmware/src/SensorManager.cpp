@@ -209,14 +209,22 @@ SensorData SensorManager::getLastReadings() { return _currentData; }
 void SensorManager::tareLoadCell() {
   // tare() internally waits until ready and averages 10 readings
   _hx711.tare(10); 
+  _currentData.weightKg = 0.0; // Reset the EMA filter instantly
 }
 
 void SensorManager::calibrateLoadCell(float knownWeight) {
   if (knownWeight != 0) {
-    // get_value(10) internally waits until ready and averages 10 readings
+    // get_value(10) internally waits until ready and averages 10 readings minus offset
     long reading = _hx711.get_value(10); 
-    float scale = (float)reading / knownWeight;
-    _hx711.set_scale(scale);
+    
+    // Safeguard: If the reading is extremely small, it means the user forgot to put 
+    // a weight on the scale before clicking calibrate. This prevents a scale factor 
+    // near 0, which would multiply noise into thousands of Kg!
+    if (abs(reading) > 500) {
+      float scale = (float)reading / knownWeight;
+      _hx711.set_scale(scale);
+      _currentData.weightKg = knownWeight; // Snap EMA to known weight
+    }
   }
 }
 
