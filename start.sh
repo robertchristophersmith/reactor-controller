@@ -10,6 +10,18 @@ export SERIAL_PORT=${SERIAL_PORT:-/dev/ttyACM0}
 # Activate Virtual Environment
 source venv/bin/activate
 
-# Run the Application
+# Run the Application in the background
 echo "Starting Reactor Controller on $SERIAL_PORT..."
-python -m uvicorn supervisory.app.main:app --host 0.0.0.0 --port 8000
+python -m uvicorn supervisory.app.main:app --host 0.0.0.0 --port 8000 &
+SERVER_PID=$!
+
+# Wait for the server to fully start
+echo "Waiting for server to start..."
+sleep 5
+
+# Launch Chromium browser in full-screen kiosk mode
+echo "Launching browser..."
+chromium-browser --kiosk http://localhost:8000/
+
+# If the browser is closed, kill the background server so port 8000 is freed
+kill $SERVER_PID
