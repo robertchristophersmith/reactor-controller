@@ -190,8 +190,17 @@ void SensorManager::update() {
 
   // Read Load Cell
   if (_hx711.is_ready()) {
-    // get_units(times) returns average over 'times' readings divided by scale
-    _currentData.weightKg = _hx711.get_units(1);
+    // Read a single raw value scaled by current calibration factor
+    float newWeight = _hx711.get_units(1);
+    
+    // Apply an Exponential Moving Average (EMA) filter to smooth the noise
+    // 20% new reading, 80% old reading.
+    if (_currentData.weightKg == 0.0) {
+       // Initialize on first read
+       _currentData.weightKg = newWeight;
+    } else {
+       _currentData.weightKg = (0.2 * newWeight) + (0.8 * _currentData.weightKg);
+    }
   }
 }
 
