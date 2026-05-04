@@ -1,4 +1,14 @@
 #include "SensorManager.h"
+#include <EEPROM.h>
+
+const int EEPROM_CALIBRATION_ADDR = 0;
+const uint32_t CALIBRATION_MAGIC = 0x1A2B3C4D;
+
+struct LoadCellCalibration {
+    uint32_t magic;
+    float scale;
+    long offset;
+};
 
 SensorManager::SensorManager() {
   _tcGasInternal = new Adafruit_MAX31855(PIN_SPI_CS_TC_GAS_INTERNAL);
@@ -75,8 +85,19 @@ void SensorManager::begin() {
   // Initialize HX711
   Serial.println("Init: HX711 Load Cell...");
   _hx711.begin(PIN_HX711_DT, PIN_HX711_SCK);
-  _hx711.set_scale(); // Default scale
-  _hx711.tare();      // Auto-tare on startup
+  
+  LoadCellCalibration cal;
+  EEPROM.get(EEPROM_CALIBRATION_ADDR, cal);
+
+  if (cal.magic == CALIBRATION_MAGIC) {
+    Serial.println("Loading Load Cell calibration from EEPROM");
+    _hx711.set_scale(cal.scale);
+    _hx711.set_offset(cal.offset);
+  } else {
+    Serial.println("No valid calibration found in EEPROM. Using defaults.");
+    _hx711.set_scale(1.f); // Default scale
+    _hx711.tare();         // Auto-tare on startup
+  }
 
   // Serial.println("Init: Sensors Done");
 }
@@ -210,6 +231,14 @@ void SensorManager::tareLoadCell() {
   // tare() internally waits until ready and averages 10 readings
   _hx711.tare(10); 
   _currentData.weightKg = 0.0; // Reset the EMA filter instantly
+
+  // Save new offset to EEPROM
+  LoadCellCalibration cal;
+  EEPROM.get(EEPROM_CALIBRATION_ADDR, cal);
+  cal.magic = CALIBRATION_MAGIC;
+  cal.offset = _hx711.get_offset();
+  cal.scale = _hx711.get_scale(); 
+  EEPROM.put(EEPROM_CALIBRATION_ADDR, cal);
 }
 
 void SensorManager::calibrateLoadCell(float knownWeight) {
@@ -224,6 +253,14 @@ void SensorManager::calibrateLoadCell(float knownWeight) {
       float scale = (float)reading / knownWeight;
       _hx711.set_scale(scale);
       _currentData.weightKg = knownWeight; // Snap EMA to known weight
+
+      // Save new scale to EEPROM
+      LoadCellCalibration cal;
+      EEPROM.get(EEPROM_CALIBRATION_ADDR, cal);
+      cal.magic = CALIBRATION_MAGIC;
+      cal.scale = scale;
+      cal.offset = _hx711.get_offset();
+      EEPROM.put(EEPROM_CALIBRATION_ADDR, cal);
     }
   }
 }
