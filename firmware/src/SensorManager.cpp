@@ -207,14 +207,13 @@ void SensorManager::update() {
 SensorData SensorManager::getLastReadings() { return _currentData; }
 
 void SensorManager::tareLoadCell() {
-  if (_hx711.is_ready()) {
-    _hx711.tare();
-  }
+  // tare() internally waits until ready and averages 10 readings
+  _hx711.tare(10); 
 }
 
 void SensorManager::calibrateLoadCell(float knownWeight) {
-  if (knownWeight != 0 && _hx711.is_ready()) {
-    // get_value returns raw reading minus offset
+  if (knownWeight != 0) {
+    // get_value(10) internally waits until ready and averages 10 readings
     long reading = _hx711.get_value(10); 
     float scale = (float)reading / knownWeight;
     _hx711.set_scale(scale);
