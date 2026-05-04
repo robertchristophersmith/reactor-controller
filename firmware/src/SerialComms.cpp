@@ -71,19 +71,8 @@ void SerialComms::sendTelemetry(const SensorData &sensors,
   doc["uptime"] = uptime;
   doc["state"] = state;
 
-  // Sensors
+  // Sensors (Only sending HX711 and Status)
   JsonObject s = doc.createNestedObject("sensors");
-  s["t_gas"] = sensors.tempGasInternal;
-  s["t_feed"] = sensors.tempFeedstock;
-  s["t_vap"] = sensors.tempVaporizerWall;
-  s["t_r_i1"] = sensors.tempReactorInt1;
-  s["t_r_i2"] = sensors.tempReactorInt2;
-  s["t_r_e1"] = sensors.tempReactorExt1;
-  s["t_r_e2"] = sensors.tempReactorExt2;
-  s["p_feed"] = sensors.pressureFeedBar;
-  s["p_reac"] = sensors.pressureReactorBar;
-  s["flow"] = sensors.flowRateSccm;
-  s["h2"] = sensors.h2ConcentrationPpm;
   s["status"] = sensors.sensorStatus;
   s["weight"] = sensors.weightKg;
 

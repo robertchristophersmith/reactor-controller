@@ -113,13 +113,13 @@
                         {/* Zone 1: Gas */}
                         <ZoneCard title="Gas Pre-Heat"
                             temp={s.t_gas} sp={sp.gas} out={h.gas}
-                            connected={!(errMask & ERR_TC_GAS_INTERNAL)}
+                            connected={false}
                             onSetSp={(v, r) => sendSetpoint(0, v, r)} />
 
                         {/* Zone 2: Vaporizer */}
                         <ZoneCard title="Vaporizer"
                             temp={s.t_vap} sp={sp.vap} out={h.vap}
-                            connected={!(errMask & ERR_TC_VAPORIZER_WALL)}
+                            connected={false}
                             onSetSp={(v, r) => sendSetpoint(1, v, r)} />
 
                         {/* Zone 3: Reactor 1 - Check both sensors? Or just Internal? Using Int for primary */}
@@ -127,7 +127,7 @@
                             temp={(s.t_r_i1 + s.t_r_e1) / 2}
                             sub={`I:${s.t_r_i1?.toFixed(1)} E:${s.t_r_e1?.toFixed(1)}`}
                             sp={sp.reac1} out={h.reac1}
-                            connected={!(errMask & ERR_TC_REACTOR_INT_1)}
+                            connected={false}
                             onSetSp={(v, r) => sendSetpoint(2, v, r)} />
 
                         {/* Zone 4: Reactor 2 */}
@@ -135,20 +135,20 @@
                             temp={(s.t_r_i2 + s.t_r_e2) / 2}
                             sub={`I:${s.t_r_i2?.toFixed(1)} E:${s.t_r_e2?.toFixed(1)}`}
                             sp={sp.reac2} out={h.reac2}
-                            connected={!(errMask & ERR_TC_REACTOR_INT_2)}
+                            connected={false}
                             onSetSp={(v, r) => sendSetpoint(3, v, r)} />
 
                         {/* Flow Control */}
                         <FlowCard title="Mass Flow"
                             flow={s.flow} sp={sp.flow}
-                            connected={!(errMask & ERR_MFC_FLOW)}
+                            connected={false}
                             onSet={(v) => fetch(`/api/control/flow?value=${v}`, { method: 'POST' })} />
 
                         {/* Sensors */}
                         <SensorCard title="Pressure" value={s.p_feed} unit="psig" color="text-red-400" border="border-red-500"
-                            connected={!(errMask & ERR_P_FEED)} />
+                            connected={false} />
                         <SensorCard title="H2 Sensor" value={s.h2} unit="%" color="text-pink-400" border="border-pink-500"
-                            connected={!(errMask & ERR_H2_SENSOR)} />
+                            connected={false} />
 
                         {/* Load Cell */}
                         <LoadCellCard weight={s.weight} 
@@ -165,12 +165,7 @@
                                 <YAxis stroke="#9CA3AF" />
                                 <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #4B5563', borderRadius: '0.5rem' }} />
                                 <Legend />
-                                <Line type="monotone" dataKey="sensors.t_gas" stroke="#60A5FA" dot={false} name="Gas" />
-                                <Line type="monotone" dataKey="sensors.t_vap" stroke="#FBBF24" dot={false} name="Vap" />
-                                <Line type="monotone" dataKey="sensors.t_r_i1" stroke="#34D399" dot={false} name="R1 Int" />
-                                <Line type="monotone" dataKey="sensors.t_r_e1" stroke="#059669" dot={false} name="R1 Ext" />
-                                <Line type="monotone" dataKey="sensors.p_feed" stroke="#EF4444" dot={false} name="Press (psi)" />
-                                <Line type="monotone" dataKey="sensors.h2" stroke="#EC4899" dot={false} name="H2 (%)" />
+                                <Line type="monotone" dataKey="sensors.weight" stroke="#14B8A6" dot={false} name="Weight (Kg)" />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
