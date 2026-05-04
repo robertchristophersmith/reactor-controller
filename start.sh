@@ -21,7 +21,15 @@ sleep 5
 
 # Launch Chromium browser in full-screen kiosk mode
 echo "Launching browser..."
-chromium-browser --kiosk http://localhost:8000/
+if command -v chromium-browser &> /dev/null; then
+    chromium-browser --kiosk http://localhost:8000/
+elif command -v chromium &> /dev/null; then
+    chromium --kiosk http://localhost:8000/
+else
+    echo "Error: Chromium browser not found! Please install it with: sudo apt install chromium-browser"
+    # Wait indefinitely so the server stays alive in the background
+    wait $SERVER_PID
+fi
 
 # If the browser is closed, kill the background server so port 8000 is freed
 kill $SERVER_PID
