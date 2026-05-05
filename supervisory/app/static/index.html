@@ -110,45 +110,7 @@
 
                     {/* Process Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        {/* Zone 1: Gas */}
-                        <ZoneCard title="Gas Pre-Heat"
-                            temp={s.t_gas} sp={sp.gas} out={h.gas}
-                            connected={false}
-                            onSetSp={(v, r) => sendSetpoint(0, v, r)} />
 
-                        {/* Zone 2: Vaporizer */}
-                        <ZoneCard title="Vaporizer"
-                            temp={s.t_vap} sp={sp.vap} out={h.vap}
-                            connected={false}
-                            onSetSp={(v, r) => sendSetpoint(1, v, r)} />
-
-                        {/* Zone 3: Reactor 1 - Check both sensors? Or just Internal? Using Int for primary */}
-                        <ZoneCard title="Reactor 1"
-                            temp={(s.t_r_i1 + s.t_r_e1) / 2}
-                            sub={`I:${s.t_r_i1?.toFixed(1)} E:${s.t_r_e1?.toFixed(1)}`}
-                            sp={sp.reac1} out={h.reac1}
-                            connected={false}
-                            onSetSp={(v, r) => sendSetpoint(2, v, r)} />
-
-                        {/* Zone 4: Reactor 2 */}
-                        <ZoneCard title="Reactor 2"
-                            temp={(s.t_r_i2 + s.t_r_e2) / 2}
-                            sub={`I:${s.t_r_i2?.toFixed(1)} E:${s.t_r_e2?.toFixed(1)}`}
-                            sp={sp.reac2} out={h.reac2}
-                            connected={false}
-                            onSetSp={(v, r) => sendSetpoint(3, v, r)} />
-
-                        {/* Flow Control */}
-                        <FlowCard title="Mass Flow"
-                            flow={s.flow} sp={sp.flow}
-                            connected={false}
-                            onSet={(v) => fetch(`/api/control/flow?value=${v}`, { method: 'POST' })} />
-
-                        {/* Sensors */}
-                        <SensorCard title="Pressure" value={s.p_feed} unit="psig" color="text-red-400" border="border-red-500"
-                            connected={false} />
-                        <SensorCard title="H2 Sensor" value={s.h2} unit="%" color="text-pink-400" border="border-pink-500"
-                            connected={false} />
 
                         {/* Load Cell */}
                         <LoadCellCard weight={s.weight} 
