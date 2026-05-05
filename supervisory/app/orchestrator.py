@@ -79,8 +79,9 @@ class Orchestrator:
             # 1.5 Auto Pump Logic
             current_weight = data.get("sensors", {}).get("weight", 0.0)
             if self.pump_mode == "auto":
-                if current_weight <= self.auto_min and not self.pump_running:
-                    await self.send_pump_control(1, "run", self.auto_dir, self.auto_target_speed)
+                if current_weight <= self.auto_min:
+                    if not self.pump_running or self.pump_speed != self.auto_target_speed or self.pump_dir != self.auto_dir:
+                        await self.send_pump_control(1, "run", self.auto_dir, self.auto_target_speed)
                 elif current_weight >= self.auto_max and self.pump_running:
                     await self.send_pump_control(1, "stop", self.auto_dir, self.auto_target_speed)
                     

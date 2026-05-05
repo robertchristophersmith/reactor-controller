@@ -209,17 +209,11 @@ void updateFSM(SensorData &data) {
   case STATE_WARMUP:
     heaters.setEnabled(true);
     flow.setEnabled(true); // Keep MFC enabled if needed
-    // Run Feedstock at low speed for warmup
-    stepperFeed.setFlowRate(5.0);
-    stepperFeed.start();
-    stepperAux.stop();
     break;
 
   case STATE_WORKING:
     heaters.setEnabled(true);
     flow.setEnabled(true);
-    stepperFeed.start();
-    stepperAux.start();
     break;
 
   case STATE_ALARM:
