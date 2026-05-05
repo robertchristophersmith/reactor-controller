@@ -25,6 +25,7 @@ class Orchestrator:
         self.auto_min = 0.0
         self.auto_max = 0.0
         self.auto_target_speed = 0
+        self.auto_dir = 0
 
     async def start(self):
         # Initialize DB
@@ -79,9 +80,9 @@ class Orchestrator:
             current_weight = data.get("sensors", {}).get("weight", 0.0)
             if self.pump_mode == "auto":
                 if current_weight <= self.auto_min and not self.pump_running:
-                    await self.send_pump_control(1, "run", self.pump_dir, self.auto_target_speed)
+                    await self.send_pump_control(1, "run", self.auto_dir, self.auto_target_speed)
                 elif current_weight >= self.auto_max and self.pump_running:
-                    await self.send_pump_control(1, "stop", self.pump_dir, self.auto_target_speed)
+                    await self.send_pump_control(1, "stop", self.auto_dir, self.auto_target_speed)
                     
             # Inject pump state into telemetry
             data["pump"] = {
@@ -91,7 +92,8 @@ class Orchestrator:
                 "speed": self.pump_speed,
                 "auto_min": self.auto_min,
                 "auto_max": self.auto_max,
-                "auto_target": self.auto_target_speed
+                "auto_target": self.auto_target_speed,
+                "auto_dir": self.auto_dir
             }
 
             # 2. Update internal state
@@ -169,11 +171,12 @@ class Orchestrator:
         self.pump_mode = "manual"
         await self.send_pump_control(1, state, dir_val, speed)
         
-    def set_pump_auto(self, min_w: float, max_w: float, target_speed: int):
+    def set_pump_auto(self, min_w: float, max_w: float, target_speed: int, dir_val: int = 0):
         self.pump_mode = "auto"
         self.auto_min = min_w
         self.auto_max = max_w
         self.auto_target_speed = target_speed
+        self.auto_dir = dir_val
 
     async def subscribe(self):
         q = asyncio.Queue()

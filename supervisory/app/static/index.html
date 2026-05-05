@@ -322,7 +322,7 @@
                             onClick={() => { fetch(`/api/control/pump/manual?state=${pump?.running?'run':'stop'}&dir=${pump?.dir||0}&speed=${pump?.speed||0}`, { method: 'POST' }); }}>Manual</button>
                         <button 
                             className={`flex-1 py-1 text-sm rounded ${isAuto ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
-                            onClick={() => { fetch(`/api/control/pump/auto?min_w=${pump?.auto_min||0}&max_w=${pump?.auto_max||0}&speed=${pump?.auto_target||0}`, { method: 'POST' }); }}>Auto</button>
+                            onClick={() => { fetch(`/api/control/pump/auto?min_w=${pump?.auto_min||0}&max_w=${pump?.auto_max||0}&speed=${pump?.auto_target||0}&dir=${pump?.auto_dir||0}`, { method: 'POST' }); }}>Auto</button>
                     </div>
 
                     {!isAuto ? (
@@ -364,8 +364,16 @@
                                 <input type="number" min="0" max="99" className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-white text-sm w-20"
                                     value={localSpeed} onChange={(e) => setLocalSpeed(e.target.value)} />
                             </div>
+                            <div className="flex justify-between items-center">
+                                <label className="text-sm text-gray-400">Dir</label>
+                                <select className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-white text-sm w-20"
+                                    value={localDir} onChange={(e) => setLocalDir(parseInt(e.target.value))}>
+                                    <option value={0}>CW</option>
+                                    <option value={1}>CCW</option>
+                                </select>
+                            </div>
                             <button className="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 py-1 rounded text-sm font-bold" 
-                                onClick={() => fetch(`/api/control/pump/auto?min_w=${localMin}&max_w=${localMax}&speed=${localSpeed}`, { method: 'POST' })}>APPLY AUTO</button>
+                                onClick={() => fetch(`/api/control/pump/auto?min_w=${localMin}&max_w=${localMax}&speed=${localSpeed}&dir=${localDir}`, { method: 'POST' })}>APPLY AUTO</button>
                         </div>
                     )}
                 </div>
