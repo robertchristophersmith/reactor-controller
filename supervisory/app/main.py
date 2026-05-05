@@ -53,6 +53,17 @@ async def calibrate_loadcell(value: float):
     await orchestrator.send_calibrate(value)
     return {"status": "command_sent", "value": value}
 
+@app.post("/api/control/pump/manual")
+async def pump_manual(state: str, dir: int, speed: int):
+    # state: "run" or "stop", dir: 0=CW, 1=CCW, speed: 0-99
+    await orchestrator.set_pump_manual(state, dir, speed)
+    return {"status": "ok"}
+
+@app.post("/api/control/pump/auto")
+async def pump_auto(min_w: float, max_w: float, speed: int):
+    orchestrator.set_pump_auto(min_w, max_w, speed)
+    return {"status": "ok"}
+
 @app.get("/api/history")
 async def get_history():
     return list(orchestrator.live_buffer)

@@ -49,6 +49,12 @@ Command SerialComms::checkCommand() {
         } else if (strcmp(typeStr, "CALIBRATE_LOADCELL") == 0) {
           cmd.type = CMD_CALIBRATE_LOADCELL;
           cmd.value = doc["val"];
+        } else if (strcmp(typeStr, "PUMP_CONTROL") == 0) {
+          cmd.type = CMD_PUMP_CONTROL;
+          cmd.zone = doc["id"];
+          cmd.state = doc["state"];
+          cmd.dir = doc["dir"];
+          cmd.value = doc["speed"];
         }
         return cmd; // Return immediately on full command
       } else {

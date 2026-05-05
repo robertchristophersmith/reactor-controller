@@ -24,17 +24,20 @@ void StepperController::setSpeed(float rpm) {
   _node.writeSingleRegister(REG_SPEED, speedVal);
 }
 
-void StepperController::start() {
+void StepperController::start(bool forward) {
   // 1. Enable Continuous Mode (0x0101 = 1)
   _node.writeSingleRegister(REG_CONTINUOUS_MODE, 1);
-  // 2. Run Forward (0x0100 = 1)
-  // Assuming 1 is Run Forward.
-  _node.writeSingleRegister(REG_RUN_STOP, 1);
+  // 2. Set Direction (0x0100: 0 = Forward, 1 = Reverse)
+  if (forward) {
+    _node.writeSingleRegister(REG_RUN_STOP, 0);
+  } else {
+    _node.writeSingleRegister(REG_RUN_STOP, 1);
+  }
 }
 
 void StepperController::stop() {
-  // Stop (0x0100 = 0)
-  _node.writeSingleRegister(REG_RUN_STOP, 0);
+  // Stop (0x0100 = 3 for Immediate Stop, 2 for Slow Stop)
+  _node.writeSingleRegister(REG_RUN_STOP, 3);
 }
 
 void StepperController::emergencyStop() {

@@ -12,7 +12,7 @@ public:
   // Core Motion
   void setFlowRate(float mlPerMin); // Calculates RPM based on mlPerRev
   void setSpeed(float rpm);         // Writes to register 0x0105
-  void start();                     // Starts motor in continuous mode
+  void start(bool forward = true);  // Starts motor in continuous mode
   void stop();
 
   // Safety

@@ -108,6 +108,17 @@ void loop() {
     case CMD_CALIBRATE_LOADCELL:
       sensors.calibrateLoadCell(cmd.value);
       break;
+    case CMD_PUMP_CONTROL:
+      if (cmd.zone == 1) {
+        stepperFeed.setSpeed(cmd.value);
+        if (cmd.state == 1) stepperFeed.start(cmd.dir == 0);
+        else stepperFeed.stop();
+      } else if (cmd.zone == 2) {
+        stepperAux.setSpeed(cmd.value);
+        if (cmd.state == 1) stepperAux.start(cmd.dir == 0);
+        else stepperAux.stop();
+      }
+      break;
     case CMD_NONE:
       break;
     }

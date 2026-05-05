@@ -16,6 +16,15 @@ class Orchestrator:
         self.latest_state = {}
         self.ramps = {} # {zone: {target: float, rate_per_sec: float, last_update: float}}
         self.subscribers = set() # WebSocket queues
+        
+        # Pump State
+        self.pump_mode = "manual"
+        self.pump_running = False
+        self.pump_dir = 0
+        self.pump_speed = 0
+        self.auto_min = 0.0
+        self.auto_max = 0.0
+        self.auto_target_speed = 0
 
     async def start(self):
         # Initialize DB
@@ -65,6 +74,25 @@ class Orchestrator:
                 
                 ramp["last_update"] = now
                 await self.send_command_setpoint(zone, new_sp)
+
+            # 1.5 Auto Pump Logic
+            current_weight = data.get("sensors", {}).get("weight", 0.0)
+            if self.pump_mode == "auto":
+                if current_weight <= self.auto_min and not self.pump_running:
+                    await self.send_pump_control(1, "run", self.pump_dir, self.auto_target_speed)
+                elif current_weight >= self.auto_max and self.pump_running:
+                    await self.send_pump_control(1, "stop", self.pump_dir, self.auto_target_speed)
+                    
+            # Inject pump state into telemetry
+            data["pump"] = {
+                "mode": self.pump_mode,
+                "running": self.pump_running,
+                "dir": self.pump_dir,
+                "speed": self.pump_speed,
+                "auto_min": self.auto_min,
+                "auto_max": self.auto_max,
+                "auto_target": self.auto_target_speed
+            }
 
             # 2. Update internal state
             self.latest_state = data
@@ -122,6 +150,30 @@ class Orchestrator:
 
     async def send_calibrate(self, value: float):
         await serial_link.send_command({"cmd": "CALIBRATE_LOADCELL", "val": value})
+        
+    async def send_pump_control(self, pump_id: int, state: str, dir_val: int, speed: int):
+        st = 1 if state == "run" else 0
+        await serial_link.send_command({
+            "cmd": "PUMP_CONTROL", 
+            "id": pump_id, 
+            "state": st, 
+            "dir": dir_val, 
+            "speed": speed
+        })
+        if pump_id == 1:
+            self.pump_running = (st == 1)
+            self.pump_dir = dir_val
+            self.pump_speed = speed
+
+    async def set_pump_manual(self, state: str, dir_val: int, speed: int):
+        self.pump_mode = "manual"
+        await self.send_pump_control(1, state, dir_val, speed)
+        
+    def set_pump_auto(self, min_w: float, max_w: float, target_speed: int):
+        self.pump_mode = "auto"
+        self.auto_min = min_w
+        self.auto_max = max_w
+        self.auto_target_speed = target_speed
 
     async def subscribe(self):
         q = asyncio.Queue()

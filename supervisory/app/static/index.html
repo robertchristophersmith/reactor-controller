@@ -109,8 +109,9 @@
                     </div>
 
                     {/* Process Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Feedstock Pump */}
+                        <PumpCard pump={s.pump} />
 
                         {/* Load Cell */}
                         <LoadCellCard weight={s.weight} 
@@ -124,10 +125,12 @@
                             <LineChart data={data}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                                 <XAxis dataKey="ts" stroke="#9CA3AF" />
-                                <YAxis stroke="#9CA3AF" />
+                                <YAxis yAxisId="left" stroke="#9CA3AF" />
+                                <YAxis yAxisId="right" orientation="right" stroke="#818CF8" />
                                 <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #4B5563', borderRadius: '0.5rem' }} />
                                 <Legend />
-                                <Line type="monotone" dataKey="sensors.weight" stroke="#14B8A6" dot={false} name="Weight (Kg)" />
+                                <Line yAxisId="left" type="monotone" dataKey="sensors.weight" stroke="#14B8A6" dot={false} name="Weight (Kg)" />
+                                <Line yAxisId="right" type="stepAfter" dataKey="pump.speed" stroke="#818CF8" dot={false} name="Pump Speed" />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -273,6 +276,98 @@
                                 }}>CALIBRATE</button>
                         </div>
                     </div>
+                </div>
+            );
+        }
+
+        function PumpCard({ pump }) {
+            const [localMin, setLocalMin] = useState(0);
+            const [localMax, setLocalMax] = useState(0);
+            const [localSpeed, setLocalSpeed] = useState(0);
+            const [localDir, setLocalDir] = useState(0);
+
+            // Sync with telemetry if not being edited (simple approach)
+            React.useEffect(() => {
+                if(pump) {
+                    setLocalMin(pump.auto_min);
+                    setLocalMax(pump.auto_max);
+                }
+            }, [pump?.auto_min, pump?.auto_max]);
+
+            const isAuto = pump?.mode === 'auto';
+
+            return (
+                <div className="bg-gray-800 p-4 rounded-lg border border-indigo-500 shadow shadow-indigo-900/20 relative overflow-hidden flex flex-col justify-between">
+                    <h3 className="text-lg font-semibold text-indigo-400 mb-2">Feedstock Pump</h3>
+                    
+                    <div className="mb-4 text-sm">
+                        <div className="flex justify-between items-center mb-1">
+                            <span className="text-gray-400">Status</span>
+                            <span className={`font-bold ${pump?.running ? 'text-green-400' : 'text-red-400'}`}>{pump?.running ? 'RUNNING' : 'STOPPED'}</span>
+                        </div>
+                        <div className="flex justify-between items-center mb-1">
+                            <span className="text-gray-400">Direction</span>
+                            <span className="text-gray-200">{pump?.dir === 0 ? 'CW' : 'CCW'}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-gray-400">Speed</span>
+                            <span className="text-gray-200">{pump?.speed || 0} / 99</span>
+                        </div>
+                    </div>
+
+                    {/* Mode Switch Tabs */}
+                    <div className="flex mb-3 bg-gray-900 rounded p-1">
+                        <button 
+                            className={`flex-1 py-1 text-sm rounded ${!isAuto ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                            onClick={() => { fetch(`/api/control/pump/manual?state=${pump?.running?'run':'stop'}&dir=${pump?.dir||0}&speed=${pump?.speed||0}`, { method: 'POST' }); }}>Manual</button>
+                        <button 
+                            className={`flex-1 py-1 text-sm rounded ${isAuto ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                            onClick={() => { fetch(`/api/control/pump/auto?min_w=${pump?.auto_min||0}&max_w=${pump?.auto_max||0}&speed=${pump?.auto_target||0}`, { method: 'POST' }); }}>Auto</button>
+                    </div>
+
+                    {!isAuto ? (
+                        <div className="flex flex-col gap-2">
+                            <div className="flex justify-between items-center">
+                                <label className="text-sm text-gray-400">Dir</label>
+                                <select className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-white text-sm"
+                                    value={localDir} onChange={(e) => setLocalDir(parseInt(e.target.value))}>
+                                    <option value={0}>CW</option>
+                                    <option value={1}>CCW</option>
+                                </select>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <label className="text-sm text-gray-400">Speed</label>
+                                <input type="number" min="0" max="99" className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-white text-sm w-20"
+                                    value={localSpeed} onChange={(e) => setLocalSpeed(e.target.value)} />
+                            </div>
+                            <div className="flex gap-2 mt-2">
+                                <button className="flex-1 bg-green-600 hover:bg-green-500 py-1 rounded text-sm font-bold" 
+                                    onClick={() => fetch(`/api/control/pump/manual?state=run&dir=${localDir}&speed=${localSpeed}`, { method: 'POST' })}>START</button>
+                                <button className="flex-1 bg-red-600 hover:bg-red-500 py-1 rounded text-sm font-bold" 
+                                    onClick={() => fetch(`/api/control/pump/manual?state=stop&dir=${localDir}&speed=${localSpeed}`, { method: 'POST' })}>STOP</button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-2">
+                            <div className="flex justify-between items-center">
+                                <label className="text-sm text-gray-400">Min (Kg)</label>
+                                <input type="number" step="0.1" className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-white text-sm w-20"
+                                    value={localMin} onChange={(e) => setLocalMin(e.target.value)} />
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <label className="text-sm text-gray-400">Max (Kg)</label>
+                                <input type="number" step="0.1" className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-white text-sm w-20"
+                                    value={localMax} onChange={(e) => setLocalMax(e.target.value)} />
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <label className="text-sm text-gray-400">Target Spd</label>
+                                <input type="number" min="0" max="99" className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-white text-sm w-20"
+                                    value={localSpeed} onChange={(e) => setLocalSpeed(e.target.value)} />
+                            </div>
+                            <button className="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 py-1 rounded text-sm font-bold" 
+                                onClick={() => fetch(`/api/control/pump/auto?min_w=${localMin}&max_w=${localMax}&speed=${localSpeed}`, { method: 'POST' })}>APPLY AUTO</button>
+                        </div>
+                    )}
                 </div>
             );
         }
