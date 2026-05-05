@@ -133,10 +133,10 @@ void loop() {
     SensorData data = sensors.getLastReadings();
 
     // B. Check Safety (Hard Limits)
-    checkSafety(data);
+    // checkSafety(data); // DISABLED: Removing FSM dependency
 
     // C. Update FSM (Logic for each state)
-    updateFSM(data);
+    // updateFSM(data); // DISABLED: Removing FSM dependency
 
     // Calc Weighted PVs (70% Internal / 30% External)
     float instant1 =
@@ -162,6 +162,8 @@ void loop() {
   }
 
   // 3. Watchdog Check
+  /* 
+  // DISABLED: Removing FSM dependency
   if (now - lastHeartbeatTime > HEARTBEAT_TIMEOUT) {
     if (currentState != STATE_FAULT && currentState != STATE_ALARM &&
         currentState != STATE_STANDBY) {
@@ -171,6 +173,7 @@ void loop() {
       comms.sendError("HEARTBEAT_TIMEOUT");
     }
   }
+  */
 }
 
 void checkSafety(SensorData &data) {
