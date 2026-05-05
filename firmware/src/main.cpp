@@ -175,6 +175,8 @@ void loop() {
 
 void checkSafety(SensorData &data) {
   // Immediate overrides regardless of state
+  /* 
+  // TEMPORARILY DISABLED: Not using temps currently
   if (data.tempGasInternal > MAX_TEMP_C_GAS ||
       data.tempReactorInt1 > MAX_TEMP_C_REACTOR ||
       data.pressureReactorBar > MAX_PRESSURE_BAR) {
@@ -195,6 +197,7 @@ void checkSafety(SensorData &data) {
       comms.sendError("SENSOR_FAILURE");
     }
   }
+  */
 }
 
 void updateFSM(SensorData &data) {
@@ -207,13 +210,15 @@ void updateFSM(SensorData &data) {
     break;
 
   case STATE_WARMUP:
-    heaters.setEnabled(true);
-    flow.setEnabled(true); // Keep MFC enabled if needed
+    // TEMPORARILY DISABLED: "no actions are triggered"
+    heaters.setEnabled(false);
+    flow.setEnabled(false); 
     break;
 
   case STATE_WORKING:
-    heaters.setEnabled(true);
-    flow.setEnabled(true);
+    // TEMPORARILY DISABLED: "no actions are triggered"
+    heaters.setEnabled(false);
+    flow.setEnabled(false);
     break;
 
   case STATE_ALARM:
