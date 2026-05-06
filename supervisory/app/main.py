@@ -3,7 +3,10 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from typing import List
 from .orchestrator import orchestrator
-from .database import engine, Base
+from .database import engine, Base, get_db
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from .crud import get_history_downsampled
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -65,8 +68,10 @@ async def pump_auto(min_w: float, max_w: float, rec_rpm: int, dir: int = 0):
     return {"status": "ok"}
 
 @app.get("/api/history")
-async def get_history():
-    return list(orchestrator.live_buffer)
+async def get_history(hours: float = 0.5, db: Session = Depends(get_db)):
+    if hours <= 0:
+        return list(orchestrator.live_buffer)
+    return get_history_downsampled(db, hours)
 
 # --- WebSocket ---
 

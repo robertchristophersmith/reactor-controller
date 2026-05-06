@@ -49,6 +49,20 @@
             const [data, setData] = useState([]);
             const [latest, setLatest] = useState(null);
             const [status, setStatus] = useState("DISCONNECTED");
+            const [timeRange, setTimeRange] = useState(0.5);
+
+            useEffect(() => {
+                const fetchHistory = async () => {
+                    try {
+                        const res = await fetch(`/api/history?hours=${timeRange}`);
+                        const hist = await res.json();
+                        setData(hist);
+                    } catch (e) {
+                        console.error("Failed to fetch history", e);
+                    }
+                };
+                fetchHistory();
+            }, [timeRange]);
 
             useEffect(() => {
                 const ws = new WebSocket(`ws://${window.location.host}/ws`);
@@ -73,7 +87,7 @@
                     setLatest(msg);
                     setData(prev => {
                         const next = [...prev, msg];
-                        if (next.length > 200) next.shift(); // Increased buffer
+                        if (next.length > 400) next.shift(); // Max 400 points to keep history + live
                         return next;
                     });
                 };
@@ -129,7 +143,18 @@
                     </div>
 
                     {/* Chart */}
-                    <div className="flex-1 bg-gray-800 p-4 rounded-lg min-h-[400px] border border-gray-700 shadow-inner">
+                    <div className="flex-1 bg-gray-800 p-4 rounded-lg min-h-[400px] border border-gray-700 shadow-inner flex flex-col">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-lg font-bold text-gray-300">Historical Data</h2>
+                            <select className="bg-gray-700 text-white border border-gray-600 rounded px-2 py-1 text-sm outline-none"
+                                value={timeRange} onChange={(e) => setTimeRange(parseFloat(e.target.value))}>
+                                <option value={0.5}>Last 30 Minutes</option>
+                                <option value={1}>Last 1 Hour</option>
+                                <option value={6}>Last 6 Hours</option>
+                                <option value={24}>Last 24 Hours</option>
+                                <option value={72}>Last 72 Hours</option>
+                            </select>
+                        </div>
                         <ResponsiveContainer width="100%" height={400}>
                             <LineChart data={data}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />

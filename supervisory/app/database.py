@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy import text
 from datetime import datetime
 from .config import settings
 
@@ -34,6 +35,10 @@ class ProcessLog(Base):
     pressure_reac: Mapped[float] = mapped_column()
     flow_rate: Mapped[float] = mapped_column()
     h2_ppm: Mapped[float] = mapped_column()
+    
+    # New Columns
+    weight: Mapped[float] = mapped_column(default=0.0)
+    pump_speed: Mapped[int] = mapped_column(default=0)
 
     # Actuators (Heater Duty Cycles)
     heater_gas: Mapped[float] = mapped_column()
@@ -47,6 +52,16 @@ class ProcessLog(Base):
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE process_log ADD COLUMN weight FLOAT DEFAULT 0.0"))
+    except Exception:
+        pass
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE process_log ADD COLUMN pump_speed INTEGER DEFAULT 0"))
+    except Exception:
+        pass
 
 def get_db():
     db = SessionLocal()
