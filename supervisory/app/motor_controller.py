@@ -48,14 +48,15 @@ class MotorController:
         async with self._lock:
             if self.client and self.client.connected:
                 try:
+                    await self.client.write_register(address, value=value, device_id=self.slave_id)
+                except TypeError:
                     try:
                         await self.client.write_register(address, value, slave=self.slave_id)
                     except TypeError:
                         await self.client.write_register(address, value, unit=self.slave_id)
                 except Exception as e:
                     self.connected = False
-                    sig = inspect.signature(self.client.write_register)
-                    self.error_msg = f"Write sig: {sig}"
+                    self.error_msg = f"Write err: {str(e)}"
                     logger.error(f"Modbus write error: {e}")
 
     async def read_registers(self, address, count):
@@ -63,9 +64,12 @@ class MotorController:
             if self.client and self.client.connected:
                 try:
                     try:
-                        result = await self.client.read_holding_registers(address, count, slave=self.slave_id)
+                        result = await self.client.read_holding_registers(address, count=count, device_id=self.slave_id)
                     except TypeError:
-                        result = await self.client.read_holding_registers(address, count, unit=self.slave_id)
+                        try:
+                            result = await self.client.read_holding_registers(address, count, slave=self.slave_id)
+                        except TypeError:
+                            result = await self.client.read_holding_registers(address, count, unit=self.slave_id)
                         
                     if not result.isError():
                         return result.registers
@@ -74,8 +78,7 @@ class MotorController:
                         self.error_msg = "Data error (isError=True)"
                 except Exception as e:
                     self.connected = False
-                    sig = inspect.signature(self.client.read_holding_registers)
-                    self.error_msg = f"Read sig: {sig}"
+                    self.error_msg = f"Read err: {str(e)}"
                     logger.error(f"Modbus read error: {e}")
         return None
 
