@@ -47,7 +47,11 @@ class MotorController:
         async with self._lock:
             if self.client and self.client.connected:
                 try:
-                    await self.client.write_register(address, value, slave=self.slave_id)
+                    try:
+                        await self.client.write_register(address, value, slave=self.slave_id)
+                    except TypeError:
+                        # Fallback for pymodbus < 3.0
+                        await self.client.write_register(address, value, unit=self.slave_id)
                 except Exception as e:
                     self.connected = False
                     self.error_msg = f"Write error: {str(e)}"
@@ -57,7 +61,12 @@ class MotorController:
         async with self._lock:
             if self.client and self.client.connected:
                 try:
-                    result = await self.client.read_holding_registers(address, count, slave=self.slave_id)
+                    try:
+                        result = await self.client.read_holding_registers(address, count, slave=self.slave_id)
+                    except TypeError:
+                        # Fallback for pymodbus < 3.0
+                        result = await self.client.read_holding_registers(address, count, unit=self.slave_id)
+                        
                     if not result.isError():
                         return result.registers
                     else:
