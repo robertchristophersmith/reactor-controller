@@ -23,6 +23,10 @@ class MotorController:
         self.expected_speed = 0
         self.is_auto_mode = False
         
+        # Connection Status
+        self.connected = False
+        self.error_msg = ""
+        
         self.override_callback = None
         self._lock = asyncio.Lock()
 
@@ -45,6 +49,8 @@ class MotorController:
                 try:
                     await self.client.write_register(address, value, slave=self.slave_id)
                 except Exception as e:
+                    self.connected = False
+                    self.error_msg = f"Write error: {str(e)}"
                     logger.error(f"Modbus write error: {e}")
 
     async def read_registers(self, address, count):
@@ -54,7 +60,12 @@ class MotorController:
                     result = await self.client.read_holding_registers(address, count, slave=self.slave_id)
                     if not result.isError():
                         return result.registers
+                    else:
+                        self.connected = False
+                        self.error_msg = "Data error (isError=True)"
                 except Exception as e:
+                    self.connected = False
+                    self.error_msg = f"Read error: {str(e)}"
                     logger.error(f"Modbus read error: {e}")
         return None
 
@@ -84,9 +95,14 @@ class MotorController:
             # Read state and dir (Register 0x0010, count 2)
             state_regs = await self.read_registers(0x0010, 2)
             if state_regs and len(state_regs) >= 2:
-                # Based on typical ZK-SMC02 mapping, adjust if needed
+                self.connected = True
+                self.error_msg = ""
                 self.physical_running = (state_regs[0] == 1)
                 self.physical_dir = state_regs[1]
+            else:
+                if self.connected: # Only set it once on failure
+                    self.connected = False
+                    self.error_msg = "Timeout or No Response"
                 
             # Read speed (Register 0x0002, count 1)
             speed_reg = await self.read_registers(0x0002, 1)

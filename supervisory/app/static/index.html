@@ -329,9 +329,17 @@
             }, [pump?.auto_min, pump?.auto_max]);
 
             const isAuto = pump?.mode === 'auto';
+            const isDisconnected = pump?.connected === false;
+            const errMsg = pump?.error || "TIMEOUT OR NO RESPONSE";
 
             return (
-                <div className="bg-gray-800 p-4 rounded-lg border border-indigo-500 shadow shadow-indigo-900/20 relative overflow-hidden flex flex-col justify-between">
+                <div className={`bg-gray-800 p-4 rounded-lg border border-indigo-500 shadow shadow-indigo-900/20 relative overflow-hidden flex flex-col justify-between ${isDisconnected ? 'grayscale opacity-80' : ''}`}>
+                    {isDisconnected && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 z-10 backdrop-blur-sm">
+                            <span className="text-red-500 font-bold border border-red-500 px-2 py-1 rounded bg-red-900/20 animate-pulse text-xs tracking-wider">MODBUS ERR: {errMsg.toUpperCase()}</span>
+                        </div>
+                    )}
+                    
                     <h3 className="text-lg font-semibold text-indigo-400 mb-2">Feedstock Pump</h3>
                     
                     <div className="mb-4 text-sm">

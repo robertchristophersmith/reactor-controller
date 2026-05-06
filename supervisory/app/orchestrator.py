@@ -108,6 +108,8 @@ class Orchestrator:
                     
             # Inject physical pump state into telemetry
             data["pump"] = {
+                "connected": motor_controller.connected,
+                "error": motor_controller.error_msg,
                 "mode": self.pump_mode,
                 "running": motor_controller.physical_running,
                 "dir": motor_controller.physical_dir,
