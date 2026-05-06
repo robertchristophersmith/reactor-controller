@@ -86,10 +86,6 @@ void loop() {
     case CMD_SET_FLOW:
       if (cmd.zone == 0)
         flow.setFlow(cmd.value);
-      if (cmd.zone == 1)
-        stepperFeed.setFlowRate(cmd.value);
-      if (cmd.zone == 2)
-        stepperAux.setFlowRate(cmd.value);
       break;
     case CMD_HEARTBEAT:
       break;
