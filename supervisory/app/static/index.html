@@ -58,6 +58,15 @@
 
                 ws.onmessage = (event) => {
                     const msg = JSON.parse(event.data);
+                    
+                    if (msg.event === "manual_override") {
+                        // We received a manual override from the backend
+                        // The backend already updated its own state, so the next telemetry will have pump.mode = 'manual'
+                        // We can alert the user
+                        console.warn("Physical manual override detected!");
+                        return; // Don't process this as a telemetry packet
+                    }
+                    
                     // Add ts for graph
                     msg.ts = new Date().toLocaleTimeString();
 
@@ -322,7 +331,7 @@
                             onClick={() => { fetch(`/api/control/pump/manual?state=${pump?.running?'run':'stop'}&dir=${pump?.dir||0}&speed=${pump?.speed||0}`, { method: 'POST' }); }}>Manual</button>
                         <button 
                             className={`flex-1 py-1 text-sm rounded ${isAuto ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
-                            onClick={() => { fetch(`/api/control/pump/auto?min_w=${pump?.auto_min||0}&max_w=${pump?.auto_max||0}&speed=${pump?.auto_target||0}&dir=${pump?.auto_dir||0}`, { method: 'POST' }); }}>Auto</button>
+                            onClick={() => { fetch(`/api/control/pump/auto?min_w=${pump?.auto_min||0}&max_w=${pump?.auto_max||0}&rec_rpm=${pump?.auto_rec_rpm||0}&dir=${pump?.auto_dir||0}`, { method: 'POST' }); }}>Auto</button>
                     </div>
 
                     {!isAuto ? (
@@ -360,7 +369,7 @@
                                     value={localMax} onChange={(e) => setLocalMax(e.target.value)} />
                             </div>
                             <div className="flex justify-between items-center">
-                                <label className="text-sm text-gray-400">Target Spd</label>
+                                <label className="text-sm text-gray-400">Rec. RPM</label>
                                 <input type="number" min="0" max="99" className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-white text-sm w-20"
                                     value={localSpeed} onChange={(e) => setLocalSpeed(e.target.value)} />
                             </div>
@@ -373,7 +382,7 @@
                                 </select>
                             </div>
                             <button className="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 py-1 rounded text-sm font-bold" 
-                                onClick={() => fetch(`/api/control/pump/auto?min_w=${localMin}&max_w=${localMax}&speed=${localSpeed}&dir=${localDir}`, { method: 'POST' })}>APPLY AUTO</button>
+                                onClick={() => fetch(`/api/control/pump/auto?min_w=${localMin}&max_w=${localMax}&rec_rpm=${localSpeed}&dir=${localDir}`, { method: 'POST' })}>APPLY AUTO</button>
                         </div>
                     )}
                 </div>

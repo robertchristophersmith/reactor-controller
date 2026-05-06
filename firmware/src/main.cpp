@@ -1,7 +1,6 @@
 #include "HeaterController.h"
 #include "SensorManager.h"
 #include "SerialComms.h"
-#include "StepperController.h"
 #include "WeightedAverage.h"
 #include "config.h"
 #include <Arduino.h>
@@ -13,8 +12,6 @@ FlowController flow;
 SerialComms comms;
 WeightedAverage wAvg1; // Zone 1
 WeightedAverage wAvg2; // Zone 2
-StepperController stepperFeed(STEPPER_ADDR_FEEDSTOCK);
-StepperController stepperAux(STEPPER_ADDR_AUX);
 
 // --- State Management ---
 ControlState currentState = STATE_STANDBY;
@@ -45,12 +42,6 @@ void setup() {
 
   flow.begin();
   // Serial.println("Flow init done");
-
-  // Init Steppers
-  Serial2.begin(STEPPER_MODBUS_BAUD);
-  stepperFeed.begin(Serial2);
-  stepperAux.begin(Serial2);
-  // Serial.println("Steppers init done");
 
   comms.begin();
   // Serial.println("Comms init done");
@@ -109,15 +100,7 @@ void loop() {
       sensors.calibrateLoadCell(cmd.value);
       break;
     case CMD_PUMP_CONTROL:
-      if (cmd.zone == 1) {
-        stepperFeed.setSpeed(cmd.value);
-        if (cmd.state == 1) stepperFeed.start(cmd.dir == 0);
-        else stepperFeed.stop();
-      } else if (cmd.zone == 2) {
-        stepperAux.setSpeed(cmd.value);
-        if (cmd.state == 1) stepperAux.start(cmd.dir == 0);
-        else stepperAux.stop();
-      }
+      // Removed from Arduino, now handled by Raspberry Pi
       break;
     case CMD_NONE:
       break;
@@ -168,8 +151,6 @@ void loop() {
     if (currentState != STATE_FAULT && currentState != STATE_ALARM &&
         currentState != STATE_STANDBY) {
       currentState = STATE_ALARM;
-      stepperFeed.emergencyStop();
-      stepperAux.emergencyStop();
       comms.sendError("HEARTBEAT_TIMEOUT");
     }
   }
@@ -186,8 +167,6 @@ void checkSafety(SensorData &data) {
 
     if (currentState != STATE_FAULT) {
       currentState = STATE_FAULT;
-      stepperFeed.emergencyStop();
-      stepperAux.emergencyStop();
       comms.sendError("SAFETY_LIMIT_EXCEEDED");
     }
   }
@@ -195,8 +174,6 @@ void checkSafety(SensorData &data) {
   if (!data.sensorsHealthy) {
     if (currentState != STATE_FAULT) {
       currentState = STATE_FAULT;
-      stepperFeed.emergencyStop();
-      stepperAux.emergencyStop();
       comms.sendError("SENSOR_FAILURE");
     }
   }
@@ -208,8 +185,6 @@ void updateFSM(SensorData &data) {
   case STATE_STANDBY:
     heaters.setEnabled(false);
     flow.setEnabled(false);
-    stepperFeed.stop();
-    stepperAux.stop();
     break;
 
   case STATE_WARMUP:
@@ -227,15 +202,11 @@ void updateFSM(SensorData &data) {
   case STATE_ALARM:
     heaters.setEnabled(false);
     flow.setEnabled(false);
-    stepperFeed.stop();
-    stepperAux.stop();
     break;
 
   case STATE_FAULT:
     heaters.setEnabled(false);
     flow.setEnabled(false);
-    stepperFeed.stop();
-    stepperAux.stop();
     break;
   }
 }

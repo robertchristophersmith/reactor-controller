@@ -60,8 +60,8 @@ async def pump_manual(state: str, dir: int, speed: int):
     return {"status": "ok"}
 
 @app.post("/api/control/pump/auto")
-async def pump_auto(min_w: float, max_w: float, speed: int, dir: int = 0):
-    orchestrator.set_pump_auto(min_w, max_w, speed, dir)
+async def pump_auto(min_w: float, max_w: float, rec_rpm: int, dir: int = 0):
+    orchestrator.set_pump_auto(min_w, max_w, rec_rpm, dir)
     return {"status": "ok"}
 
 @app.get("/api/history")

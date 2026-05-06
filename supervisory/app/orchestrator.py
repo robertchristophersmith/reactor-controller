@@ -4,6 +4,8 @@ from .serial_interface import serial_link
 from .database import SessionLocal, init_db
 from .crud import create_log
 import logging
+from .motor_controller import motor_controller
+import time
 
 logger = logging.getLogger("orchestrator")
 
@@ -19,25 +21,47 @@ class Orchestrator:
         
         # Pump State
         self.pump_mode = "manual"
-        self.pump_running = False
-        self.pump_dir = 0
-        self.pump_speed = 0
+        
+        # New Auto Logic State
         self.auto_min = 0.0
         self.auto_max = 0.0
-        self.auto_target_speed = 0
+        self.auto_rec_rpm = 0
         self.auto_dir = 0
+        
+        self.weight_history = deque()
+        self.next_eval_time = 0
+        
+        # Connect Motor Override Callback
+        motor_controller.override_callback = self.handle_manual_override
+        self.auto_task = None
+        self.poll_task = None
+
+    async def handle_manual_override(self):
+        logger.warning("Manual override received from Motor Controller!")
+        self.pump_mode = "manual"
+        # Broadcast the manual_override event
+        override_event = {"event": "manual_override", "mode": "manual"}
+        for q in list(self.subscribers):
+            try:
+                await q.put(override_event)
+            except Exception:
+                pass
 
     async def start(self):
         # Initialize DB
         init_db()
         
-        # Connect Serial
+        # Connect Serial to Arduino
         serial_link.set_telemetry_callback(self.handle_telemetry)
         await serial_link.connect()
+        
+        # Connect to Motor Controller on Pi
+        await motor_controller.connect()
+        self.poll_task = asyncio.create_task(motor_controller.poll_loop())
+        self.auto_task = asyncio.create_task(self.auto_mode_loop())
 
     async def handle_telemetry(self, data: dict):
         try:
-            import time
             now = time.time()
 
             # 1. Update Ramps
@@ -76,24 +100,21 @@ class Orchestrator:
                 ramp["last_update"] = now
                 await self.send_command_setpoint(zone, new_sp)
 
-            # 1.5 Auto Pump Logic
+            # Add to weight history for rolling average
             current_weight = data.get("sensors", {}).get("weight", 0.0)
-            if self.pump_mode == "auto":
-                if current_weight <= self.auto_min:
-                    if not self.pump_running or self.pump_speed != self.auto_target_speed or self.pump_dir != self.auto_dir:
-                        await self.send_pump_control(1, "run", self.auto_dir, self.auto_target_speed)
-                elif current_weight >= self.auto_max and self.pump_running:
-                    await self.send_pump_control(1, "stop", self.auto_dir, self.auto_target_speed)
+            self.weight_history.append((now, current_weight))
+            while self.weight_history and self.weight_history[0][0] < now - 60:
+                self.weight_history.popleft()
                     
-            # Inject pump state into telemetry
+            # Inject physical pump state into telemetry
             data["pump"] = {
                 "mode": self.pump_mode,
-                "running": self.pump_running,
-                "dir": self.pump_dir,
-                "speed": self.pump_speed,
+                "running": motor_controller.physical_running,
+                "dir": motor_controller.physical_dir,
+                "speed": motor_controller.physical_speed,
                 "auto_min": self.auto_min,
                 "auto_max": self.auto_max,
-                "auto_target": self.auto_target_speed,
+                "auto_rec_rpm": self.auto_rec_rpm,
                 "auto_dir": self.auto_dir
             }
 
@@ -154,30 +175,70 @@ class Orchestrator:
     async def send_calibrate(self, value: float):
         await serial_link.send_command({"cmd": "CALIBRATE_LOADCELL", "val": value})
         
-    async def send_pump_control(self, pump_id: int, state: str, dir_val: int, speed: int):
-        st = 1 if state == "run" else 0
-        await serial_link.send_command({
-            "cmd": "PUMP_CONTROL", 
-            "id": pump_id, 
-            "state": st, 
-            "dir": dir_val, 
-            "speed": speed
-        })
-        if pump_id == 1:
-            self.pump_running = (st == 1)
-            self.pump_dir = dir_val
-            self.pump_speed = speed
-
     async def set_pump_manual(self, state: str, dir_val: int, speed: int):
         self.pump_mode = "manual"
-        await self.send_pump_control(1, state, dir_val, speed)
+        motor_controller.set_auto_mode(False)
+        self.next_eval_time = 0 # Interrupt auto delays
+        run = True if state == "run" else False
+        await motor_controller.set_motor(run, dir_val, speed)
         
-    def set_pump_auto(self, min_w: float, max_w: float, target_speed: int, dir_val: int = 0):
+    def set_pump_auto(self, min_w: float, max_w: float, rec_rpm: int, dir_val: int = 0):
         self.pump_mode = "auto"
         self.auto_min = min_w
         self.auto_max = max_w
-        self.auto_target_speed = target_speed
+        self.auto_rec_rpm = rec_rpm
         self.auto_dir = dir_val
+        self.next_eval_time = 0 # Force immediate evaluation
+        motor_controller.set_auto_mode(True)
+
+    async def auto_mode_loop(self):
+        while True:
+            await asyncio.sleep(1)
+            if self.pump_mode != "auto" or not motor_controller.is_auto_mode:
+                continue
+                
+            if time.time() < self.next_eval_time:
+                continue
+
+            if not self.weight_history:
+                continue
+                
+            # Calculate 60s rolling average
+            avg_weight = sum(w for t, w in self.weight_history) / len(self.weight_history)
+            
+            w_min = self.auto_min
+            w_max = self.auto_max
+            rng = w_max - w_min
+            
+            target_rpm = 0
+            run_motor = True
+            delay = 60
+            
+            if avg_weight < w_min:
+                # Underflow
+                target_rpm = 99
+                delay = 60
+            elif avg_weight <= (w_min + (rng * 0.25)):
+                # Lower 25% Band
+                target_rpm = min(99, self.auto_rec_rpm * 2)
+                delay = 300
+            elif avg_weight <= (w_max - (rng * 0.25)):
+                # Middle 50% Band
+                target_rpm = self.auto_rec_rpm
+                delay = 60
+            elif avg_weight <= w_max:
+                # Upper 25% Band
+                target_rpm = int(self.auto_rec_rpm * 0.5)
+                delay = 300
+            else:
+                # Overflow
+                run_motor = False
+                target_rpm = 0
+                delay = 300
+                
+            await motor_controller.set_motor(run_motor, self.auto_dir, target_rpm)
+            self.next_eval_time = time.time() + delay
+            logger.info(f"Auto Eval: AvgW={avg_weight:.2f}, Act={run_motor}@{target_rpm}RPM, NextEval={delay}s")
 
     async def subscribe(self):
         q = asyncio.Queue()
