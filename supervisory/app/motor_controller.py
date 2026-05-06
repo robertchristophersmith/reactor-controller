@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import inspect
 from pymodbus.client import AsyncModbusSerialClient
 import time
 
@@ -48,16 +49,13 @@ class MotorController:
             if self.client and self.client.connected:
                 try:
                     try:
-                        await self.client.write_register(address, value, device_id=self.slave_id)
+                        await self.client.write_register(address, value, slave=self.slave_id)
                     except TypeError:
-                        try:
-                            await self.client.write_register(address, value, slave=self.slave_id)
-                        except TypeError:
-                            # Fallback for pymodbus < 3.0
-                            await self.client.write_register(address, value, unit=self.slave_id)
+                        await self.client.write_register(address, value, unit=self.slave_id)
                 except Exception as e:
                     self.connected = False
-                    self.error_msg = f"Write error: {str(e)}"
+                    sig = inspect.signature(self.client.write_register)
+                    self.error_msg = f"Write sig: {sig}"
                     logger.error(f"Modbus write error: {e}")
 
     async def read_registers(self, address, count):
@@ -65,13 +63,9 @@ class MotorController:
             if self.client and self.client.connected:
                 try:
                     try:
-                        result = await self.client.read_holding_registers(address, count, device_id=self.slave_id)
+                        result = await self.client.read_holding_registers(address, count, slave=self.slave_id)
                     except TypeError:
-                        try:
-                            result = await self.client.read_holding_registers(address, count, slave=self.slave_id)
-                        except TypeError:
-                            # Fallback for pymodbus < 3.0
-                            result = await self.client.read_holding_registers(address, count, unit=self.slave_id)
+                        result = await self.client.read_holding_registers(address, count, unit=self.slave_id)
                         
                     if not result.isError():
                         return result.registers
@@ -80,7 +74,8 @@ class MotorController:
                         self.error_msg = "Data error (isError=True)"
                 except Exception as e:
                     self.connected = False
-                    self.error_msg = f"Read error: {str(e)}"
+                    sig = inspect.signature(self.client.read_holding_registers)
+                    self.error_msg = f"Read sig: {sig}"
                     logger.error(f"Modbus read error: {e}")
         return None
 
