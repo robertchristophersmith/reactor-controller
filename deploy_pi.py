@@ -112,6 +112,20 @@ def main():
             run_command(["usermod", "-a", "-G", "dialout", user], sudo=True)
         except Exception as e:
             print(f"Could not add user to dialout group: {e}")
+            
+    # 6. Configure UDEV rules for dual Arduinos
+    print_step("Configuring UDEV rules for Arduino predictability...")
+    udev_rules = 'SUBSYSTEM=="tty", ATTRS{idVendor}=="2341", ATTRS{idProduct}=="0042", SYMLINK+="sensor_arduino"\nSUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", SYMLINK+="pump_arduino"\n'
+    try:
+        rule_path = "/tmp/99-arduinos.rules"
+        with open(rule_path, "w") as f:
+            f.write(udev_rules)
+        run_command(["cp", rule_path, "/etc/udev/rules.d/99-arduinos.rules"], sudo=True)
+        run_command(["udevadm", "control", "--reload-rules"], sudo=True)
+        run_command(["udevadm", "trigger"], sudo=True)
+        print("UDEV rules applied.")
+    except Exception as e:
+        print(f"Could not configure UDEV rules: {e}")
     
     # 6. Final Instructions
     print_step("Installation Complete!")

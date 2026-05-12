@@ -4,37 +4,39 @@ This guide provides instructions for setting up both the **embedded firmware** (
 
 ## 1. Hardware Setup
 
-1. Connect the **Arduino** to the **Raspberry Pi** via USB.
-2. Ensure all sensors and heaters are correctly wired to the Arduino according to the schematic.
-3. Ensure the Raspberry Pi is connected to the network.
+1. Connect **both Arduinos** to the **Raspberry Pi** via USB.
+   - **Sensor Arduino** (Arduino Mega)
+   - **Pump Arduino** (Arduino Uno)
+2. Ensure all sensors and heaters are correctly wired to the Mega according to the schematic.
+3. Ensure the TB6600 Stepper Driver is correctly wired to the Uno (Pins 8, 9, 10).
+4. Ensure the Raspberry Pi is connected to the network.
 
 ---
 
 ## 2. Firmware Installation (Arduino)
 
-The firmware is built using **PlatformIO**. You can install it using Visual Studio Code or the command line.
+The system uses two separate firmware projects built with **PlatformIO**.
 
 ### Option A: VS Code (Recommended)
-1. Install **Visual Studio Code**.
-2. Install the **PlatformIO IDE** extension.
-3. Open the `firmware` folder of this repository in VS Code.
-4. Click the **PlatformIO icon** (Alien face) in the sidebar.
-5. Under **Project Tasks**, select your environment (e.g., `megaatmega2560`) and click **Upload**.
+1. Install **Visual Studio Code** and the **PlatformIO IDE** extension.
+2. Open the `firmware` folder to flash the **Sensor Arduino** (Mega).
+3. Open the `pump_firmware` folder to flash the **Pump Arduino** (Uno).
+4. Use the PlatformIO sidebar to Upload to the respective boards.
 
 ### Option B: Command Line (CLI) - Linux/Raspberry Pi
-1. **Recommended Method**: Use the installer script (works best on Raspberry Pi):
+1. Install PlatformIO Core:
    ```bash
    curl -fsSL -o get-platformio.py https://raw.githubusercontent.com/platformio/platformio-core-installer/master/get-platformio.py
    python3 get-platformio.py
    ```
-   *Follow the on-screen instructions to add the `pio` command to your PATH.*
-
-2. Navigate to the firmware directory:
+2. Flash the Sensor Arduino:
    ```bash
    cd ~/reactor-controller/firmware
+   ~/.platformio/penv/bin/pio run -t upload
    ```
-3. Build and Upload:
+3. Flash the Pump Arduino:
    ```bash
+   cd ~/reactor-controller/pump_firmware
    ~/.platformio/penv/bin/pio run -t upload
    ```
 
