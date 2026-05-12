@@ -10,7 +10,6 @@
 AccelStepper stepper(1, STEP_PIN, DIR_PIN);
 
 String inputString = "";         // A String to hold incoming data
-bool stringComplete = false;     // Whether the string is complete
 
 long targetSpeed = 0;
 bool isRunning = false;
@@ -51,7 +50,8 @@ void parseCommand(String cmd) {
     Serial.println(speedVal);
   }
   else {
-    Serial.println("ERR:UNKNOWN_CMD");
+    Serial.print("ERR:UNKNOWN_CMD: ");
+    Serial.println(cmd);
   }
 }
 
@@ -73,17 +73,12 @@ void loop() {
   // Read Serial
   while (Serial.available()) {
     char inChar = (char)Serial.read();
-    inputString += inChar;
     if (inChar == '\n') {
-      stringComplete = true;
+      parseCommand(inputString);
+      inputString = "";
+    } else {
+      inputString += inChar;
     }
-  }
-
-  // Parse Command
-  if (stringComplete) {
-    parseCommand(inputString);
-    inputString = "";
-    stringComplete = false;
   }
 
   // Apply State
