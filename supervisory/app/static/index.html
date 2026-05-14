@@ -50,8 +50,18 @@
             const [latest, setLatest] = useState(null);
             const [status, setStatus] = useState("DISCONNECTED");
             const [timeRange, setTimeRange] = useState(0.5);
+            const [runStatus, setRunStatus] = useState(null);
+            const [sessionReady, setSessionReady] = useState(false);
 
             useEffect(() => {
+                fetch('/api/run/status')
+                    .then(r => r.json())
+                    .then(s => setRunStatus(s))
+                    .catch(e => console.error(e));
+            }, []);
+
+            useEffect(() => {
+                if (!sessionReady) return;
                 const fetchHistory = async () => {
                     try {
                         const res = await fetch(`/api/history?hours=${timeRange}`);
@@ -62,9 +72,10 @@
                     }
                 };
                 fetchHistory();
-            }, [timeRange]);
+            }, [timeRange, sessionReady]);
 
             useEffect(() => {
+                if (!sessionReady) return;
                 const ws = new WebSocket(`ws://${window.location.host}/ws`);
 
                 ws.onopen = () => setStatus("CONNECTED");
@@ -93,7 +104,7 @@
                 };
 
                 return () => ws.close();
-            }, []);
+            }, [sessionReady]);
 
             const sendState = async (s) => {
                 await fetch(`/api/control/state/${s}`, { method: 'POST' });
@@ -101,6 +112,12 @@
 
             const sendSetpoint = async (zone, val, rate) => {
                 await fetch(`/api/control/setpoint?zone=${zone}&value=${val}&rate=${rate || 0}`, { method: 'POST' });
+            }
+
+            if (!runStatus) return <div className="p-10 text-center text-gray-400">Loading Session State...</div>;
+            
+            if (!sessionReady) {
+                return <RunManagerModal status={runStatus} onComplete={() => setSessionReady(true)} />;
             }
 
             if (!latest) return <div className="p-10 text-center text-gray-400 animate-pulse">Waiting for telemetry...</div>;
@@ -170,6 +187,66 @@
                     </div>
                 </div>
             );
+        function RunManagerModal({ status, onComplete }) {
+            const [step, setStep] = useState(status.has_data ? "DETECTED" : "NEW_NAME");
+            const [runName, setRunName] = useState("");
+
+            const handleResume = () => {
+                onComplete();
+            };
+
+            const handleExportAndClear = () => {
+                window.location.href = '/api/run/export';
+                setTimeout(() => setStep("NEW_NAME"), 1500); // Give it a moment to trigger download
+            };
+
+            const handleClearOnly = () => {
+                setStep("NEW_NAME");
+            };
+
+            const handleStartNew = async () => {
+                if (!runName) return alert("Please enter a Run Name");
+                await fetch(`/api/run/new?run_name=${encodeURIComponent(runName)}`, { method: 'POST' });
+                onComplete();
+            };
+
+            if (step === "DETECTED") {
+                return (
+                    <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+                        <div className="bg-gray-800 p-8 rounded-xl border border-gray-600 max-w-md w-full shadow-2xl">
+                            <h2 className="text-2xl font-bold mb-4 text-blue-400">Run Session Detected</h2>
+                            <p className="text-gray-300 mb-6">There is data in the database from a previous run: <span className="font-bold text-white bg-gray-700 px-2 py-1 rounded">{status.current_run_name || 'Unnamed Run'}</span></p>
+                            <div className="flex flex-col gap-3">
+                                <button onClick={handleResume} className="bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-bold text-white shadow">Resume Run</button>
+                                <div className="border-t border-gray-700 my-3"></div>
+                                <p className="text-sm text-gray-400 mb-1">Start a New Run:</p>
+                                <button onClick={handleExportAndClear} className="bg-green-600 hover:bg-green-500 py-3 rounded-lg font-bold text-white shadow">Export Data & Start New</button>
+                                <button onClick={handleClearOnly} className="bg-red-600 hover:bg-red-500 py-3 rounded-lg font-bold text-white shadow">Discard Data & Start New</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (step === "NEW_NAME") {
+                return (
+                    <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+                        <div className="bg-gray-800 p-8 rounded-xl border border-gray-600 max-w-md w-full shadow-2xl">
+                            <h2 className="text-2xl font-bold mb-4 text-blue-400">Start New Run</h2>
+                            <p className="text-gray-300 mb-4">Please name this reactor session. This name will be used for the exported CSV file later.</p>
+                            <input type="text" 
+                                className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white mb-6 focus:border-blue-500 outline-none" 
+                                value={runName} 
+                                onChange={e => setRunName(e.target.value)} 
+                                placeholder="e.g., Batch_001_H2_Test" 
+                                autoFocus
+                            />
+                            <button onClick={handleStartNew} className="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-bold text-white shadow">Start Recording</button>
+                        </div>
+                    </div>
+                );
+            }
+            return null;
         }
 
 

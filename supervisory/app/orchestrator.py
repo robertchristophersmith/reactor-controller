@@ -59,6 +59,8 @@ class Orchestrator:
         await motor_controller.connect()
         self.poll_task = asyncio.create_task(motor_controller.poll_loop())
         self.auto_task = asyncio.create_task(self.auto_mode_loop())
+        self.r1m_task = asyncio.create_task(self.rollup_1m_loop())
+        self.r10m_task = asyncio.create_task(self.rollup_10m_loop())
 
     async def handle_telemetry(self, data: dict):
         try:
@@ -124,16 +126,15 @@ class Orchestrator:
             self.latest_state = data
             self.live_buffer.append(data)
             
-            # 3. Log to Database (Sync wrapper for now, SQLite is fast enough)
-            # Ideally use run_in_executor for heavy DB ops
+            # 3. Log to Database (Only during WARMUP or WORKING)
             try:
                 uptime = data.get("uptime", 0)
                 state = data.get("state", 0)
                 
-                # Create a new session for this operation
-                with SessionLocal() as db:
-                    create_log(db, data, uptime, state)
-                    
+                # State 1 = WARMUP, State 2 = WORKING
+                if state in [1, 2]:
+                    with SessionLocal() as db:
+                        create_log(db, data, uptime, state)
             except Exception as e:
                 logger.error(f"DB Log Error: {e}")
 
@@ -143,10 +144,29 @@ class Orchestrator:
                     await q.put(data)
                 except Exception:
                     self.subscribers.remove(q)
-            print(f"Orchestrator: Processed telemetry. Buffer size: {len(self.live_buffer)}") # DEBUG
         except Exception as e:
             logger.error(f"Error in handle_telemetry: {e}")
             print(f"CRITICAL ORCHESTRATOR ERROR: {e}")
+
+    async def rollup_1m_loop(self):
+        while True:
+            await asyncio.sleep(60)
+            try:
+                with SessionLocal() as db:
+                    from .crud import perform_1m_rollup
+                    perform_1m_rollup(db)
+            except Exception as e:
+                logger.error(f"1m Rollup Error: {e}")
+
+    async def rollup_10m_loop(self):
+        while True:
+            await asyncio.sleep(600)
+            try:
+                with SessionLocal() as db:
+                    from .crud import perform_10m_rollup
+                    perform_10m_rollup(db)
+            except Exception as e:
+                logger.error(f"10m Rollup Error: {e}")
 
     async def send_command_setpoint(self, zone: int, value: float):
          await serial_link.send_command({"cmd": "SET_TEMP", "zone": zone, "val": value})

@@ -3,10 +3,13 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from typing import List
 from .orchestrator import orchestrator
-from .database import engine, Base, get_db
+from .database import engine, Base, get_db, RunsMetadata, Logs1s, Logs1m, Logs10m
 from sqlalchemy.orm import Session
 from fastapi import Depends
 from .crud import get_history_downsampled
+from fastapi.responses import StreamingResponse
+import io
+import csv
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -72,6 +75,70 @@ async def get_history(hours: float = 0.5, db: Session = Depends(get_db)):
     if hours <= 0:
         return list(orchestrator.live_buffer)
     return get_history_downsampled(db, hours)
+
+# --- Run Management Endpoints ---
+
+@app.get("/api/run/status")
+async def get_run_status(db: Session = Depends(get_db)):
+    run_meta = db.query(RunsMetadata).order_by(RunsMetadata.id.desc()).first()
+    has_data = db.query(Logs1s.id).first() is not None
+    
+    return {
+        "has_data": has_data,
+        "current_run_name": run_meta.run_name if run_meta else None,
+        "status": run_meta.status if run_meta else None
+    }
+
+@app.post("/api/run/new")
+async def start_new_run(run_name: str, db: Session = Depends(get_db)):
+    # Clear all data
+    db.query(Logs1s).delete()
+    db.query(Logs1m).delete()
+    db.query(Logs10m).delete()
+    db.query(RunsMetadata).delete()
+    
+    # Create new run
+    new_run = RunsMetadata(run_name=run_name, status="active")
+    db.add(new_run)
+    db.commit()
+    
+    return {"status": "ok", "run_name": run_name}
+
+@app.get("/api/run/export")
+async def export_run(db: Session = Depends(get_db)):
+    run_meta = db.query(RunsMetadata).order_by(RunsMetadata.id.desc()).first()
+    run_name = run_meta.run_name if run_meta else "reactor_run"
+    
+    logs = db.query(Logs1s).order_by(Logs1s.timestamp.asc()).all()
+    
+    # Create CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Header
+    writer.writerow(["Timestamp", "Uptime", "State", "Temp_Gas", "Temp_Feed", "Temp_Vap", "Temp_R_I1", "Temp_R_I2", "Weight", "Pump_Speed"])
+    
+    for log in logs:
+        writer.writerow([
+            log.timestamp.isoformat(),
+            log.uptime,
+            log.control_state,
+            log.temp_gas,
+            log.temp_feed,
+            log.temp_vap,
+            log.temp_r_i1,
+            log.temp_r_i2,
+            log.weight,
+            log.pump_speed
+        ])
+        
+    output.seek(0)
+    
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={run_name}.csv"}
+    )
 
 # --- WebSocket ---
 
