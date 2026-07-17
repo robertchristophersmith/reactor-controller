@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  supervisory:
+    build:
+      context: .
+      dockerfile: supervisory/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=development
+    depends_on:
+      - sensor_emulator
+      - pump_emulator
+
+  sensor_emulator:
+    build:
+      context: .
+      dockerfile: emulators/Dockerfile
+    command: python sensor_emulator.py
+    ports:
+      - "9999:9999"
+    environment:
+      - PUMP_EMULATOR_HOST=pump_emulator
+      - PUMP_EMULATOR_PORT=9998
+    depends_on:
+      - pump_emulator
+
+  pump_emulator:
+    build:
+      context: .
+      dockerfile: emulators/Dockerfile
+    command: python pump_emulator.py
+    ports:
+      - "9998:9998"

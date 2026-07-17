@@ -17,7 +17,7 @@ def send_setpoint(zone, value):
         return None
 
 def get_latest_telemetry():
-    url = f"{BASE_URL}/api/history"
+    url = f"{BASE_URL}/api/history?hours=0"
     try:
         with urllib.request.urlopen(url) as response:
             history = json.loads(response.read().decode())

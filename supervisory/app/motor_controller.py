@@ -1,13 +1,14 @@
 import asyncio
 import logging
 import serial_asyncio
+from .config import settings
 
 logger = logging.getLogger("motor_controller")
 
 class MotorController:
-    def __init__(self, port="/dev/pump_arduino", baudrate=9600):
-        self.port = port
-        self.baudrate = baudrate
+    def __init__(self, port=None, baudrate=None):
+        self.port = port if port is not None else settings.PUMP_PORT
+        self.baudrate = baudrate if baudrate is not None else settings.PUMP_BAUD
         self.reader = None
         self.writer = None
         
@@ -31,13 +32,51 @@ class MotorController:
 
     async def connect(self):
         try:
-            self.reader, self.writer = await serial_asyncio.open_serial_connection(url=self.port, baudrate=self.baudrate)
+            if self.port.startswith("socket://"):
+                host_port = self.port.replace("socket://", "")
+                host, port = host_port.split(":")
+                self.reader, self.writer = await asyncio.open_connection(host, int(port))
+            else:
+                self.reader, self.writer = await serial_asyncio.open_serial_connection(url=self.port, baudrate=self.baudrate)
             self.connected = True
             logger.info(f"Connected to Pump Controller at {self.port}")
+            # Start read loop
+            asyncio.create_task(self._read_loop())
         except Exception as e:
             self.connected = False
             self.error_msg = f"Connection failed: {e}"
             logger.error(self.error_msg)
+
+    async def _read_loop(self):
+        while self.connected:
+            try:
+                line = await self.reader.readline()
+                if not line:
+                    self.connected = False
+                    self.error_msg = "Connection lost"
+                    break
+                decoded = line.decode('utf-8', errors='ignore').strip()
+                if decoded.startswith("{"):
+                    continue
+                logger.debug(f"PUMP SERIAL: {decoded}")
+                
+                # Check for OK responses to update physical state
+                if decoded == "OK:START":
+                    self.physical_running = True
+                elif decoded == "OK:STOP":
+                    self.physical_running = False
+                elif decoded == "OK:DIR_FWD":
+                    self.physical_dir = 0
+                elif decoded == "OK:DIR_REV":
+                    self.physical_dir = 1
+                elif decoded.startswith("OK:SPEED_"):
+                    try:
+                        self.physical_speed = int(decoded.split("_")[1])
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.error(f"Pump serial read error: {e}")
+                await asyncio.sleep(1)
 
     async def send_command(self, cmd: str):
         async with self._lock:
@@ -73,11 +112,10 @@ class MotorController:
     async def poll_loop(self):
         while True:
             await asyncio.sleep(0.5)
-            # In Phase 3, we will read from self.reader to get actual status
-            # For now, we mock the physical state to match expected state if connected
-            if self.connected:
-                self.physical_running = self.expected_running
-                self.physical_dir = self.expected_dir
-                self.physical_speed = self.expected_speed
+            # In Phase 3 / Dev emulator mode, physical state is updated by _read_loop.
+            # To ensure local testing works cleanly, if connection is lost, reset state:
+            if not self.connected:
+                self.physical_running = False
+                self.physical_speed = 0
 
 motor_controller = MotorController()

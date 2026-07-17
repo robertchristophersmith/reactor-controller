@@ -72,6 +72,66 @@ Open a web browser on any device on the same network and navigate to:
 
 ---
 
+## 4. Local Testing & Development Environment
+
+To develop or test the supervisory control logic without physical hardware (Arduinos, sensors, and pumps), we provide a local emulator environment. This emulates both the Sensor Arduino (Mega) and the Pump Arduino (Uno) via TCP sockets.
+
+### Option A: Docker Compose (Recommended)
+
+Ensure you have **Docker** and **Docker Compose** installed and running.
+
+1. Build and start the services:
+   ```bash
+   docker compose build
+   docker compose up
+   ```
+   *This starts:*
+   - **supervisory** (FastAPI at `http://localhost:8000`)
+   - **sensor_emulator** (TCP port `9999`)
+   - **pump_emulator** (TCP port `9998`)
+
+2. Open `http://localhost:8000` in your web browser.
+
+### Option B: Running Locally (Without Docker)
+
+You can run the emulators and FastAPI app directly on your local machine using Python.
+
+1. Install Python dependencies:
+   ```bash
+   pip install -r supervisory/requirements.txt
+   ```
+
+2. Start the **Pump Emulator** in a terminal:
+   ```bash
+   python emulators/pump_emulator.py
+   ```
+
+3. Start the **Sensor Emulator** in another terminal:
+   ```bash
+   # Linux/macOS
+   export PUMP_EMULATOR_HOST=localhost
+   python emulators/sensor_emulator.py
+
+   # Windows PowerShell
+   $env:PUMP_EMULATOR_HOST="localhost"
+   python emulators/sensor_emulator.py
+   ```
+
+4. Start the **Supervisory Controller** pointing to the local socket emulators:
+   ```bash
+   # Linux/macOS
+   export APP_ENV=development
+   python -m uvicorn supervisory.app.main:app --host 127.0.0.1 --port 8000
+
+   # Windows PowerShell
+   $env:APP_ENV="development"
+   python -m uvicorn supervisory.app.main:app --host 127.0.0.1 --port 8000
+   ```
+
+5. Access the interface at `http://localhost:8000`.
+
+---
+
 ## Troubleshooting
 
 - **Serial Permission Denied**: If you get a "Permission denied" error when identifying the serial port, ensure you have rebooted or logged out/in after the installation script added you to the `dialout` group.
