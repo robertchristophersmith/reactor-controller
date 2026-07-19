@@ -17,13 +17,11 @@
 #undef PIN_SPI_MISO
 #endif
 #define PIN_SPI_MISO 50
-#define PIN_SPI_CS_TC_GAS_INTERNAL 22   // Gas Preheat
-#define PIN_SPI_CS_TC_VAPORIZER_WALL 23 // Vaporizer Wall
-#define PIN_SPI_CS_TC_REACTOR_EXT_1 24  // Reactor Zone 1 (Top) External
-#define PIN_SPI_CS_TC_REACTOR_INT_1 25  // Reactor Zone 1 (Top) Internal
-#define PIN_SPI_CS_TC_REACTOR_EXT_2 26  // Reactor Zone 2 (Bottom) External
-#define PIN_SPI_CS_TC_REACTOR_INT_2 27  // Reactor Zone 2 (Bottom) Internal
-#define PIN_SPI_CS_TC_FEEDSTOCK 28      // Feedstock
+#define PIN_SPI_CS_TC_FEEDSTOCK_RESERVOIR 28 // Feedstock reservoir
+#define PIN_SPI_CS_TC_FEEDSTOCK_PREHEATER 22  // External feedstock preheater
+#define PIN_SPI_CS_TC_LIQUID_REACTOR 25       // Internal liquid phase reactor
+#define PIN_SPI_CS_TC_GAS_REACTOR_INT 27      // Internal gas phase reactor
+#define PIN_SPI_CS_TC_GAS_REACTOR_EXT 26      // External gas phase reactor
 
 // --- I2C Bus (ADS1115) ---
 // Hardware I2C: SDA=20, SCL=21
@@ -50,15 +48,14 @@
 #define H2_MAX_PERCENT 100.0
 
 // --- Actuators (Heaters - SSRs) ---
-#define PIN_HEATER_GAS 6       // PWM capable
-#define PIN_HEATER_VAPORIZER 7 // PWM capable
-#define PIN_HEATER_REACTOR_1 8 // PWM capable
-#define PIN_HEATER_REACTOR_2 9 // PWM capable
+#define PIN_HEATER_FEEDSTOCK_PREHEATER 6 // PWM capable
+#define PIN_HEATER_LIQUID_REACTOR 8      // PWM capable
+#define PIN_HEATER_GAS_REACTOR 9         // PWM capable
 
 // --- Safety Limits ---
-#define MAX_TEMP_C_GAS 500.0
-#define MAX_TEMP_C_REACTOR 800.0
-#define MAX_PRESSURE_BAR 10.0
+#define MAX_TEMP_C_PREHEATER 300.0
+#define MAX_TEMP_C_LIQUID_REACTOR 500.0
+#define MAX_TEMP_C_GAS_REACTOR 800.0
 
 // --- Control Loop ---
 #define LOOP_INTERVAL_MS 100 // 10Hz Control Loop

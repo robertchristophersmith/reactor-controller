@@ -9,8 +9,7 @@
 SensorManager sensors;
 HeaterController heaters;
 SerialComms comms;
-WeightedAverage wAvg1; // Zone 1
-WeightedAverage wAvg2; // Zone 2
+WeightedAverage wAvgGas; // Smooth gas reactor temp
 
 // --- State Management ---
 ControlState currentState = STATE_STANDBY;
@@ -60,21 +59,14 @@ void loop() {
     switch (cmd.type) {
     case CMD_SET_TEMP:
       if (cmd.zone == 0)
-        heaters.setSetpoints(cmd.value, heaters.getSetpointVaporizer(),
-                             heaters.getSetpointReactor1(),
-                             heaters.getSetpointReactor2());
+        heaters.setSetpoints(cmd.value, heaters.getSetpointLiquid(),
+                             heaters.getSetpointGas());
       if (cmd.zone == 1)
-        heaters.setSetpoints(heaters.getSetpointGas(), cmd.value,
-                             heaters.getSetpointReactor1(),
-                             heaters.getSetpointReactor2());
+        heaters.setSetpoints(heaters.getSetpointPreheater(), cmd.value,
+                             heaters.getSetpointGas());
       if (cmd.zone == 2)
-        heaters.setSetpoints(heaters.getSetpointGas(),
-                             heaters.getSetpointVaporizer(), cmd.value,
-                             heaters.getSetpointReactor2());
-      if (cmd.zone == 3)
-        heaters.setSetpoints(heaters.getSetpointGas(),
-                             heaters.getSetpointVaporizer(),
-                             heaters.getSetpointReactor1(), cmd.value);
+        heaters.setSetpoints(heaters.getSetpointPreheater(),
+                             heaters.getSetpointLiquid(), cmd.value);
       break;
     case CMD_SET_STATE:
       currentState = (ControlState)cmd.state;
@@ -110,20 +102,16 @@ void loop() {
     // C. Update FSM (Logic for each state)
     // updateFSM(data); // DISABLED: Removing FSM dependency
 
-    // Calc Weighted PVs (70% Internal / 30% External)
-    float instant1 =
-        (data.tempReactorInt1 * 0.7) + (data.tempReactorExt1 * 0.3);
-    float instant2 =
-        (data.tempReactorInt2 * 0.7) + (data.tempReactorExt2 * 0.3);
+    // Calc Weighted PVs (70% Internal / 30% External) for Gas Reactor
+    float instantGas =
+        (data.tempGasReactorInt * 0.7) + (data.tempGasReactorExt * 0.3);
 
-    wAvg1.add(instant1);
-    wAvg2.add(instant2);
+    wAvgGas.add(instantGas);
 
-    float pv1 = wAvg1.getAverage();
-    float pv2 = wAvg2.getAverage();
+    float pvGas = wAvgGas.getAverage();
 
     // D. Update Heaters (PID calculation)
-    heaters.update(data.tempGasInternal, data.tempVaporizerWall, pv1, pv2);
+    heaters.update(data.tempFeedstockPreheater, data.tempLiquidReactor, pvGas);
 
     // E. Telemetry (1Hz)
     if (now - lastTelemetryTime >= 1000) {

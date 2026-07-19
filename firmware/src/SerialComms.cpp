@@ -70,24 +70,28 @@ void SerialComms::sendTelemetry(const SensorData &sensors,
   doc["uptime"] = uptime;
   doc["state"] = state;
 
-  // Sensors (Only sending HX711 and Status)
+  // Sensors
   JsonObject s = doc.createNestedObject("sensors");
   s["status"] = sensors.sensorStatus;
   s["weight"] = sensors.weightKg;
+  s["t_feed_res"] = sensors.tempFeedstockReservoir;
+  s["t_feed_pre"] = sensors.tempFeedstockPreheater;
+  s["t_liq_reac"] = sensors.tempLiquidReactor;
+  s["t_gas_reac_int"] = sensors.tempGasReactorInt;
+  s["t_gas_reac_ext"] = sensors.tempGasReactorExt;
+  s["h2"] = sensors.h2ConcentrationPpm;
 
   // Heaters
   JsonObject h = doc.createNestedObject("heaters");
-  h["gas"] = heaters.getOutputGas();
-  h["vap"] = heaters.getOutputVaporizer();
-  h["reac1"] = heaters.getOutputReactor1();
-  h["reac2"] = heaters.getOutputReactor2();
+  h["feed_pre"] = heaters.getOutputPreheater();
+  h["liq_reac"] = heaters.getOutputLiquid();
+  h["gas_reac"] = heaters.getOutputGas();
 
   // Setpoints
   JsonObject sp = doc.createNestedObject("sp");
-  sp["gas"] = heaters.getSetpointGas();
-  sp["vap"] = heaters.getSetpointVaporizer();
-  sp["reac1"] = heaters.getSetpointReactor1();
-  sp["reac2"] = heaters.getSetpointReactor2();
+  sp["feed_pre"] = heaters.getSetpointPreheater();
+  sp["liq_reac"] = heaters.getSetpointLiquid();
+  sp["gas_reac"] = heaters.getSetpointGas();
 
   serializeJson(doc, Serial);
   Serial.println();

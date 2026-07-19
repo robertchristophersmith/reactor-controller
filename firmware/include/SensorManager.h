@@ -13,18 +13,13 @@
 
 struct SensorData {
   // Temperatures (Celsius)
-  float tempGasInternal;
-  float tempFeedstock;
-  float tempVaporizerWall;
-  float tempReactorInt1;
-  float tempReactorInt2;
-  float tempReactorExt1;
-  float tempReactorExt2;
+  float tempFeedstockReservoir;
+  float tempFeedstockPreheater;
+  float tempLiquidReactor;
+  float tempGasReactorInt;
+  float tempGasReactorExt;
 
   // Analog Sensors
-  float pressureFeedBar;
-  float pressureReactorBar;
-  float flowRateSccm;
   float h2ConcentrationPpm;
   float weightKg;
 
@@ -35,17 +30,12 @@ struct SensorData {
 };
 
 // Error Bits
-#define ERR_TC_GAS_INTERNAL (1 << 0)
-#define ERR_TC_FEEDSTOCK (1 << 1)
-#define ERR_TC_VAPORIZER_WALL (1 << 2)
-#define ERR_TC_REACTOR_INT_1 (1 << 3)
-#define ERR_TC_REACTOR_INT_2 (1 << 4)
-#define ERR_TC_REACTOR_EXT_1 (1 << 5)
-#define ERR_TC_REACTOR_EXT_2 (1 << 6)
-#define ERR_P_FEED (1 << 7)
-#define ERR_P_REACTOR (1 << 8)
-#define ERR_MFC_FLOW (1 << 9)
-#define ERR_H2_SENSOR (1 << 10)
+#define ERR_TC_FEEDSTOCK_RESERVOIR (1 << 0)
+#define ERR_TC_FEEDSTOCK_PREHEATER (1 << 1)
+#define ERR_TC_LIQUID_REACTOR (1 << 2)
+#define ERR_TC_GAS_REACTOR_INT (1 << 3)
+#define ERR_TC_GAS_REACTOR_EXT (1 << 4)
+#define ERR_H2_SENSOR (1 << 5)
 
 class SensorManager {
 public:
@@ -59,17 +49,13 @@ public:
 
 private:
   // Thermocouple Objects
-  Adafruit_MAX31855 *_tcGasInternal;
-  Adafruit_MAX31855 *_tcFeedstock;
-  Adafruit_MAX31855 *_tcVaporizerWall;
-  Adafruit_MAX31855 *_tcReactorInt1;
-  Adafruit_MAX31855 *_tcReactorInt2;
-  Adafruit_MAX31855 *_tcReactorExt1;
-  Adafruit_MAX31855 *_tcReactorExt2;
+  Adafruit_MAX31855 *_tcFeedstockReservoir;
+  Adafruit_MAX31855 *_tcFeedstockPreheater;
+  Adafruit_MAX31855 *_tcLiquidReactor;
+  Adafruit_MAX31855 *_tcGasReactorInt;
+  Adafruit_MAX31855 *_tcGasReactorExt;
 
   // ADC Objects
-  Adafruit_ADS1115 _adsMFC;
-  Adafruit_ADS1115 _adsPressure;
   Adafruit_ADS1115 _adsH2;
 
   HX711 _hx711;

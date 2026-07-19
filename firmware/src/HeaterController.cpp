@@ -2,111 +2,86 @@
 
 HeaterController::HeaterController() {
   // Initialize Variables
+  _spPreheater = 0;
+  _inPreheater = 0;
+  _outPreheater = 0;
+  _spLiquid = 0;
+  _inLiquid = 0;
+  _outLiquid = 0;
   _spGas = 0;
   _inGas = 0;
   _outGas = 0;
-  _spVaporizer = 0;
-  _inVaporizer = 0;
-  _outVaporizer = 0;
-  _spReactor1 = 0;
-  _inReactor1 = 0;
-  _outReactor1 = 0;
-  _spReactor2 = 0;
-  _inReactor2 = 0;
-  _outReactor2 = 0;
 
   _enabled = false;
   _windowStartTime = millis();
 
-  // P_ON_M specifies Proportional on Measurement (reduces overshoot) if
-  // supported, but standard constructor is (&Input, &Output, &Setpoint, Kp, Ki,
-  // Kd, Direction)
+  // Initialize PIDs
+  _pidPreheater = new PID(&_inPreheater, &_outPreheater, &_spPreheater, _kp, _ki, _kd, DIRECT);
+  _pidLiquid = new PID(&_inLiquid, &_outLiquid, &_spLiquid, _kp, _ki, _kd, DIRECT);
   _pidGas = new PID(&_inGas, &_outGas, &_spGas, _kp, _ki, _kd, DIRECT);
-  _pidVaporizer = new PID(&_inVaporizer, &_outVaporizer, &_spVaporizer, _kp,
-                          _ki, _kd, DIRECT);
-  _pidReactor1 =
-      new PID(&_inReactor1, &_outReactor1, &_spReactor1, _kp, _ki, _kd, DIRECT);
-  _pidReactor2 =
-      new PID(&_inReactor2, &_outReactor2, &_spReactor2, _kp, _ki, _kd, DIRECT);
 }
 
 void HeaterController::begin() {
-  pinMode(PIN_HEATER_GAS, OUTPUT);
-  pinMode(PIN_HEATER_VAPORIZER, OUTPUT);
-  pinMode(PIN_HEATER_REACTOR_1, OUTPUT);
-  pinMode(PIN_HEATER_REACTOR_2, OUTPUT);
+  pinMode(PIN_HEATER_FEEDSTOCK_PREHEATER, OUTPUT);
+  pinMode(PIN_HEATER_LIQUID_REACTOR, OUTPUT);
+  pinMode(PIN_HEATER_GAS_REACTOR, OUTPUT);
 
-  digitalWrite(PIN_HEATER_GAS, LOW);
-  digitalWrite(PIN_HEATER_VAPORIZER, LOW);
-  digitalWrite(PIN_HEATER_REACTOR_1, LOW);
-  digitalWrite(PIN_HEATER_REACTOR_2, LOW);
+  digitalWrite(PIN_HEATER_FEEDSTOCK_PREHEATER, LOW);
+  digitalWrite(PIN_HEATER_LIQUID_REACTOR, LOW);
+  digitalWrite(PIN_HEATER_GAS_REACTOR, LOW);
 
   // Limit output to 0-WINDOW_SIZE (time proportional)
+  _pidPreheater->SetOutputLimits(0, WINDOW_SIZE);
+  _pidLiquid->SetOutputLimits(0, WINDOW_SIZE);
   _pidGas->SetOutputLimits(0, WINDOW_SIZE);
-  _pidVaporizer->SetOutputLimits(0, WINDOW_SIZE);
-  _pidReactor1->SetOutputLimits(0, WINDOW_SIZE);
-  _pidReactor2->SetOutputLimits(0, WINDOW_SIZE);
 
+  _pidPreheater->SetMode(AUTOMATIC);
+  _pidLiquid->SetMode(AUTOMATIC);
   _pidGas->SetMode(AUTOMATIC);
-  _pidVaporizer->SetMode(AUTOMATIC);
-  _pidReactor1->SetMode(AUTOMATIC);
-  _pidReactor2->SetMode(AUTOMATIC);
 }
 
-void HeaterController::setSetpoints(float spGas, float spVaporizer,
-                                    float spReactor1, float spReactor2) {
+void HeaterController::setSetpoints(float spPreheater, float spLiquid, float spGas) {
+  _spPreheater = spPreheater;
+  _spLiquid = spLiquid;
   _spGas = spGas;
-  _spVaporizer = spVaporizer;
-  _spReactor1 = spReactor1;
-  _spReactor2 = spReactor2;
 }
 
 void HeaterController::setEnabled(bool enabled) {
   _enabled = enabled;
   if (!enabled) {
     // Force outputs off immediately
-    digitalWrite(PIN_HEATER_GAS, LOW);
-    digitalWrite(PIN_HEATER_VAPORIZER, LOW);
-    digitalWrite(PIN_HEATER_REACTOR_1, LOW);
-    digitalWrite(PIN_HEATER_REACTOR_2, LOW);
+    digitalWrite(PIN_HEATER_FEEDSTOCK_PREHEATER, LOW);
+    digitalWrite(PIN_HEATER_LIQUID_REACTOR, LOW);
+    digitalWrite(PIN_HEATER_GAS_REACTOR, LOW);
 
-    // Reset PID integral terms? Usually good practice, or set mode to MANUAL.
-    // For simplicity:
+    _pidPreheater->SetMode(MANUAL);
+    _pidLiquid->SetMode(MANUAL);
     _pidGas->SetMode(MANUAL);
-    _pidVaporizer->SetMode(MANUAL);
-    _pidReactor1->SetMode(MANUAL);
-    _pidReactor2->SetMode(MANUAL);
+    _outPreheater = 0;
+    _outLiquid = 0;
     _outGas = 0;
-    _outVaporizer = 0;
-    _outReactor1 = 0;
-    _outReactor2 = 0;
   } else {
+    _pidPreheater->SetMode(AUTOMATIC);
+    _pidLiquid->SetMode(AUTOMATIC);
     _pidGas->SetMode(AUTOMATIC);
-    _pidVaporizer->SetMode(AUTOMATIC);
-    _pidReactor1->SetMode(AUTOMATIC);
-    _pidReactor2->SetMode(AUTOMATIC);
   }
 }
 
-void HeaterController::update(float tempGas, float tempVaporizer,
-                              float tempReactor1, float tempReactor2) {
+void HeaterController::update(float tempPreheater, float tempLiquid, float tempGas) {
   if (!_enabled) {
-    digitalWrite(PIN_HEATER_GAS, LOW);
-    digitalWrite(PIN_HEATER_VAPORIZER, LOW);
-    digitalWrite(PIN_HEATER_REACTOR_1, LOW);
-    digitalWrite(PIN_HEATER_REACTOR_2, LOW);
+    digitalWrite(PIN_HEATER_FEEDSTOCK_PREHEATER, LOW);
+    digitalWrite(PIN_HEATER_LIQUID_REACTOR, LOW);
+    digitalWrite(PIN_HEATER_GAS_REACTOR, LOW);
     return;
   }
 
+  _inPreheater = tempPreheater;
+  _inLiquid = tempLiquid;
   _inGas = tempGas;
-  _inVaporizer = tempVaporizer;
-  _inReactor1 = tempReactor1;
-  _inReactor2 = tempReactor2;
 
+  _pidPreheater->Compute();
+  _pidLiquid->Compute();
   _pidGas->Compute();
-  _pidVaporizer->Compute();
-  _pidReactor1->Compute();
-  _pidReactor2->Compute();
 
   // Time Proportional Logic
   unsigned long now = millis();
@@ -114,10 +89,9 @@ void HeaterController::update(float tempGas, float tempVaporizer,
     _windowStartTime += WINDOW_SIZE;
   }
 
-  applyTimeProportional(PIN_HEATER_GAS, _outGas);
-  applyTimeProportional(PIN_HEATER_VAPORIZER, _outVaporizer);
-  applyTimeProportional(PIN_HEATER_REACTOR_1, _outReactor1);
-  applyTimeProportional(PIN_HEATER_REACTOR_2, _outReactor2);
+  applyTimeProportional(PIN_HEATER_FEEDSTOCK_PREHEATER, _outPreheater);
+  applyTimeProportional(PIN_HEATER_LIQUID_REACTOR, _outLiquid);
+  applyTimeProportional(PIN_HEATER_GAS_REACTOR, _outGas);
 }
 
 void HeaterController::applyTimeProportional(int pin, double output) {

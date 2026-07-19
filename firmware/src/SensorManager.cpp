@@ -11,39 +11,42 @@ struct LoadCellCalibration {
 };
 
 SensorManager::SensorManager() {
-  _tcGasInternal = new Adafruit_MAX31855(PIN_SPI_CS_TC_GAS_INTERNAL);
-  _tcFeedstock = new Adafruit_MAX31855(PIN_SPI_CS_TC_FEEDSTOCK);
-  _tcVaporizerWall = new Adafruit_MAX31855(PIN_SPI_CS_TC_VAPORIZER_WALL);
-  _tcReactorInt1 = new Adafruit_MAX31855(PIN_SPI_CS_TC_REACTOR_INT_1);
-  _tcReactorInt2 = new Adafruit_MAX31855(PIN_SPI_CS_TC_REACTOR_INT_2);
-  _tcReactorExt1 = new Adafruit_MAX31855(PIN_SPI_CS_TC_REACTOR_EXT_1);
-  _tcReactorExt2 = new Adafruit_MAX31855(PIN_SPI_CS_TC_REACTOR_EXT_2);
+  _tcFeedstockReservoir = new Adafruit_MAX31855(PIN_SPI_CS_TC_FEEDSTOCK_RESERVOIR);
+  _tcFeedstockPreheater = new Adafruit_MAX31855(PIN_SPI_CS_TC_FEEDSTOCK_PREHEATER);
+  _tcLiquidReactor = new Adafruit_MAX31855(PIN_SPI_CS_TC_LIQUID_REACTOR);
+  _tcGasReactorInt = new Adafruit_MAX31855(PIN_SPI_CS_TC_GAS_REACTOR_INT);
+  _tcGasReactorExt = new Adafruit_MAX31855(PIN_SPI_CS_TC_GAS_REACTOR_EXT);
 }
 
-void SensorManager::begin() {
-  // --- SPI CS INITIALIZATION DISABLED ---
-  /*
-  pinMode(PIN_SPI_CS_TC_GAS_INTERNAL, OUTPUT);
-  pinMode(PIN_SPI_CS_TC_FEEDSTOCK, OUTPUT);
-  pinMode(PIN_SPI_CS_TC_VAPORIZER_WALL, OUTPUT);
-  pinMode(PIN_SPI_CS_TC_REACTOR_INT_1, OUTPUT);
-  pinMode(PIN_SPI_CS_TC_REACTOR_INT_2, OUTPUT);
-  pinMode(PIN_SPI_CS_TC_REACTOR_EXT_1, OUTPUT);
-  pinMode(PIN_SPI_CS_TC_REACTOR_EXT_2, OUTPUT);
+  // Initialize Chip Selects
+  pinMode(PIN_SPI_CS_TC_FEEDSTOCK_RESERVOIR, OUTPUT);
+  pinMode(PIN_SPI_CS_TC_FEEDSTOCK_PREHEATER, OUTPUT);
+  pinMode(PIN_SPI_CS_TC_LIQUID_REACTOR, OUTPUT);
+  pinMode(PIN_SPI_CS_TC_GAS_REACTOR_INT, OUTPUT);
+  pinMode(PIN_SPI_CS_TC_GAS_REACTOR_EXT, OUTPUT);
 
-  digitalWrite(PIN_SPI_CS_TC_GAS_INTERNAL, HIGH);
-  digitalWrite(PIN_SPI_CS_TC_FEEDSTOCK, HIGH);
-  digitalWrite(PIN_SPI_CS_TC_VAPORIZER_WALL, HIGH);
-  digitalWrite(PIN_SPI_CS_TC_REACTOR_INT_1, HIGH);
-  digitalWrite(PIN_SPI_CS_TC_REACTOR_INT_2, HIGH);
-  digitalWrite(PIN_SPI_CS_TC_REACTOR_EXT_1, HIGH);
-  digitalWrite(PIN_SPI_CS_TC_REACTOR_EXT_2, HIGH);
+  digitalWrite(PIN_SPI_CS_TC_FEEDSTOCK_RESERVOIR, HIGH);
+  digitalWrite(PIN_SPI_CS_TC_FEEDSTOCK_PREHEATER, HIGH);
+  digitalWrite(PIN_SPI_CS_TC_LIQUID_REACTOR, HIGH);
+  digitalWrite(PIN_SPI_CS_TC_GAS_REACTOR_INT, HIGH);
+  digitalWrite(PIN_SPI_CS_TC_GAS_REACTOR_EXT, HIGH);
+
+  // Initialize TC instances
+  if (!_tcFeedstockReservoir->begin())
+    Serial.println("TC Feedstock Res init failed");
+  if (!_tcFeedstockPreheater->begin())
+    Serial.println("TC Feedstock Pre init failed");
+  if (!_tcLiquidReactor->begin())
+    Serial.println("TC Liquid Reac init failed");
+  if (!_tcGasReactorInt->begin())
+    Serial.println("TC Gas Reac Int init failed");
+  if (!_tcGasReactorExt->begin())
+    Serial.println("TC Gas Reac Ext init failed");
 
   // Initialize Hardware SPI
   SPI.begin();
   // Slow down SPI to ~500kHz (16MHz / 32) for stability
   SPI.setClockDivider(SPI_CLOCK_DIV32);
-  */
 
   // Initialize ADCs
   // Initialize ADCs
@@ -105,109 +108,60 @@ void SensorManager::begin() {
 void SensorManager::update() {
   _currentData.sensorStatus = 0;
 
-  // All TCs offline
-  _currentData.tempGasInternal = 0.0;
-  _currentData.tempFeedstock = 0.0;
-  _currentData.tempVaporizerWall = 0.0;
-  _currentData.tempReactorExt1 = 0.0;
-  _currentData.tempReactorInt1 = 0.0;
-  _currentData.tempReactorExt2 = 0.0;
-  _currentData.tempReactorInt2 = 0.0;
-
-  // Force healthy to avoid faults
-  _currentData.sensorsHealthy = true;
-
-  // --- Read ADCs with 0.5-4.5V scaling and Disconnect Detection ---
-  // Helper: Check if I2C device is alive before reading to prevent hanging
-  auto isConnected = [](uint8_t addr) -> bool {
-    // Disabling I2C Checks
-    return false;
-    // Wire.beginTransmission(addr);
-    // return (Wire.endTransmission() == 0);
+  // Helper to read TC and print error if any
+  auto readTc = [&](Adafruit_MAX31855 *tc, const char *name) -> float {
+    float t = tc->readCelsius();
+    if (isnan(t)) {
+      uint8_t err = tc->readError();
+      Serial.print("Error ");
+      Serial.print(name);
+      Serial.print(": 0x");
+      Serial.println(err, HEX);
+      return NAN;
+    }
+    if (t == 0.0) {
+      uint8_t err = tc->readError();
+      if (err) {
+        Serial.print("Error (0.0) ");
+        Serial.print(name);
+        Serial.print(": 0x");
+        Serial.println(err, HEX);
+      }
+    }
+    return t;
   };
 
-  // Helper to read voltage for diagnostics
-  auto getVolts = [&](Adafruit_ADS1115 &ads, int ch, uint8_t addr) -> float {
-    if (!isConnected(addr))
-      return 0.0f;
-    return ads.computeVolts(ads.readADC_SingleEnded(ch));
-  };
+  _currentData.tempFeedstockReservoir = readTc(_tcFeedstockReservoir, "FeedRes");
+  if (isnan(_currentData.tempFeedstockReservoir))
+    _currentData.sensorStatus |= ERR_TC_FEEDSTOCK_RESERVOIR;
 
-  // 1. Pressure
-  _currentData.pressureFeedBar = 0.0; // Disabled
+  _currentData.tempFeedstockPreheater = readTc(_tcFeedstockPreheater, "FeedPre");
+  if (isnan(_currentData.tempFeedstockPreheater))
+    _currentData.sensorStatus |= ERR_TC_FEEDSTOCK_PREHEATER;
 
-  // 2. Flow (MFC)
-  _currentData.flowRateSccm = 0.0; // Disabled
+  _currentData.tempLiquidReactor = readTc(_tcLiquidReactor, "LiqReac");
+  if (isnan(_currentData.tempLiquidReactor))
+    _currentData.sensorStatus |= ERR_TC_LIQUID_REACTOR;
 
-  // 3. H2 Sensor
-  _currentData.h2ConcentrationPpm = 0.0; // Disabled
+  _currentData.tempGasReactorInt = readTc(_tcGasReactorInt, "GasReacInt");
+  if (isnan(_currentData.tempGasReactorInt))
+    _currentData.sensorStatus |= ERR_TC_GAS_REACTOR_INT;
 
-  /* I2C SENSORS DISABLED
-  if (isConnected(I2C_ADDR_ADS1115_PRESSURE)) {
-    float pVolts =
-        getVolts(_adsPressure, ADC_CH_PRESSURE, I2C_ADDR_ADS1115_PRESSURE);
-    if (pVolts < 0.2) { // Disconnected (Floating/Pull-down) or Broken Wire
-      _currentData.sensorStatus |= ERR_P_FEED;
-      _currentData.pressureFeedBar = 0;
-    } else {
-      // Scale: 0.5V=0, 4.5V=Max. Clamp logic inside readScaled-like math
-      if (pVolts <= 0.5)
-        _currentData.pressureFeedBar = 0.0;
-      else if (pVolts >= 4.5)
-        _currentData.pressureFeedBar = PRESSURE_MAX_PSIG;
-      else
-        _currentData.pressureFeedBar =
-            (pVolts - 0.5) * (PRESSURE_MAX_PSIG / 4.0);
-    }
+  _currentData.tempGasReactorExt = readTc(_tcGasReactorExt, "GasReacExt");
+  if (isnan(_currentData.tempGasReactorExt))
+    _currentData.sensorStatus |= ERR_TC_GAS_REACTOR_EXT;
+
+  if (isnan(_currentData.tempFeedstockReservoir) ||
+      isnan(_currentData.tempFeedstockPreheater) ||
+      isnan(_currentData.tempLiquidReactor) ||
+      isnan(_currentData.tempGasReactorInt) ||
+      isnan(_currentData.tempGasReactorExt)) {
+    _currentData.sensorsHealthy = false;
   } else {
-    _currentData.sensorStatus |= ERR_P_FEED; // Mark as error if I2C missing
-    _currentData.pressureFeedBar = 0;
+    _currentData.sensorsHealthy = true;
   }
 
-  // 2. Flow (MFC)
-  if (isConnected(I2C_ADDR_ADS1115_MFC)) {
-    float fVolts =
-        getVolts(_adsMFC, ADC_CH_MFC_FLOW_READ, I2C_ADDR_ADS1115_MFC);
-    if (fVolts < 0.2) {
-      _currentData.sensorStatus |= ERR_MFC_FLOW;
-      _currentData.flowRateSccm = 0;
-    } else {
-      if (fVolts <= 0.5)
-        _currentData.flowRateSccm = 0.0;
-      else if (fVolts >= 4.5)
-        _currentData.flowRateSccm = MFC_FLOW_MAX_SCCM;
-      else
-        _currentData.flowRateSccm = (fVolts - 0.5) * (MFC_FLOW_MAX_SCCM / 4.0);
-    }
-  } else {
-    _currentData.sensorStatus |= ERR_MFC_FLOW;
-    _currentData.flowRateSccm = 0;
-  }
-
-  // 3. H2 Sensor
-  if (isConnected(I2C_ADDR_ADS1115_H2)) {
-    float hVolts = getVolts(_adsH2, ADC_CH_H2_SENSOR, I2C_ADDR_ADS1115_H2);
-    if (hVolts < 0.2) {
-      _currentData.sensorStatus |= ERR_H2_SENSOR;
-      _currentData.h2ConcentrationPpm = 0;
-    } else {
-      if (hVolts <= 0.5)
-        _currentData.h2ConcentrationPpm = 0.0;
-      else if (hVolts >= 4.5)
-        _currentData.h2ConcentrationPpm = H2_MAX_PERCENT;
-      else
-        _currentData.h2ConcentrationPpm =
-            (hVolts - 0.5) * (H2_MAX_PERCENT / 4.0);
-    }
-  } else {
-    _currentData.sensorStatus |= ERR_H2_SENSOR;
-    _currentData.h2ConcentrationPpm = 0;
-  }
-  */
-
-  // Default failure values so loop continues (Modified to only set Reactor
-  // Pressure)
-  _currentData.pressureReactorBar = 0;
+  _currentData.h2ConcentrationPpm = 0.0;
 
   // Read Load Cell
   if (_hx711.is_ready()) {
