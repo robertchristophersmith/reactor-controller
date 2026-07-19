@@ -99,6 +99,7 @@ def perform_1m_rollup(db: Session):
             AVG(sp_gas), AVG(sp_vap), AVG(sp_reac)
         FROM logs_1s
         WHERE timestamp >= datetime('now', '-1 minute')
+        HAVING MAX(timestamp) IS NOT NULL
     """)
     db.execute(sql)
     db.commit()
@@ -118,6 +119,7 @@ def perform_10m_rollup(db: Session):
             AVG(sp_gas), AVG(sp_vap), AVG(sp_reac)
         FROM logs_1m
         WHERE timestamp >= datetime('now', '-10 minutes')
+        HAVING MAX(timestamp) IS NOT NULL
     """)
     db.execute(sql)
     db.commit()
