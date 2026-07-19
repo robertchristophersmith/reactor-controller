@@ -7,7 +7,35 @@ This guide provides instructions for setting up both the **embedded firmware** (
 1. Connect **both Arduinos** to the **Raspberry Pi** via USB.
    - **Sensor Arduino** (Arduino Mega)
    - **Pump Arduino** (Arduino Uno)
-2. Ensure all sensors and heaters are correctly wired to the Mega according to the schematic.
+2. Wire all sensors, breakout boards, and heater solid-state relays (SSRs) to the **Arduino Mega** as follows:
+   - **SPI Thermocouple Breakout Boards (MAX31855)**:
+     - **Common Pins**: Connect the **SCK** pin of all 7 breakout boards to Mega **Pin 52** (Hardware SPI SCK), and the **MISO** pin of all 7 boards to Mega **Pin 50** (Hardware SPI MISO). Power all boards with **3.3V** and common **GND**.
+     - **Chip Select (CS) Pins**:
+       - **Gas Preheat (Gas Internal)**: Connect CS to Mega **Pin 22**.
+       - **Vaporizer Wall**: Connect CS to Mega **Pin 23**.
+       - **Reactor Zone 1 (Top) External**: Connect CS to Mega **Pin 24**.
+       - **Reactor Zone 1 (Top) Internal**: Connect CS to Mega **Pin 25**.
+       - **Reactor Zone 2 (Bottom) External**: Connect CS to Mega **Pin 26**.
+       - **Reactor Zone 2 (Bottom) Internal**: Connect CS to Mega **Pin 27**.
+       - **Feedstock Temp**: Connect CS to Mega **Pin 28**.
+   - **I2C Bus Devices (ADS1115 ADCs and MCP4725 DAC)**:
+     - **Common Pins**: Connect the **SDA** pin of all I2C boards to Mega **Pin 20** (Hardware I2C SDA), and the **SCL** pin to Mega **Pin 21** (Hardware I2C SCL). Power all boards with **5V** (or 3.3V) and common **GND**.
+     - **I2C Address Configuration**:
+       - **ADS1115 (MFC Flow Feedback)**: Connect the **ADDR** pin to **GND** (I2C Address `0x48`).
+       - **ADS1115 (Pressure Transducer)**: Connect the **ADDR** pin to **VDD/VCC** (I2C Address `0x49`).
+       - **ADS1115 (Hydrogen/H2 Sensor)**: Connect the **ADDR** pin to **SDA** (I2C Address `0x4A`).
+       - **MCP4725 DAC (MFC Flow Control)**: Connect the **ADDR** or **A0** pin to **GND** (I2C Address `0x62`).
+   - **Load Cell Amplifier (HX711)**:
+     - Connect the **DT** (Data) pin to Mega **Pin 3**.
+     - Connect the **SCK** (Clock) pin to Mega **Pin 2**.
+     - Connect **VCC** to **5V** and **GND** to **GND**.
+   - **Actuators & Heaters (via Solid State Relays / SSRs)**:
+     - Connect the positive control terminal (+) of each SSR to the respective Mega pins:
+       - **Gas Preheat Heater SSR**: Mega **Pin 6** (PWM).
+       - **Vaporizer Heater SSR**: Mega **Pin 7** (PWM).
+       - **Reactor Zone 1 (Top) Heater SSR**: Mega **Pin 8** (PWM).
+       - **Reactor Zone 2 (Bottom) Heater SSR**: Mega **Pin 9** (PWM).
+     - Connect the negative control terminal (-) of all SSRs to the Mega's **GND**.
 3. Ensure the TB6600 Stepper Driver is correctly wired to the Uno (Pins 8, 9, 10).
 4. Ensure the Raspberry Pi is connected to the network.
 
