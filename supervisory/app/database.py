@@ -28,18 +28,13 @@ class LogMixin:
     control_state: Mapped[int] = mapped_column()
 
     # Sensors - Temperatures
-    temp_gas: Mapped[float] = mapped_column()
-    temp_feed: Mapped[float] = mapped_column()
-    temp_vap: Mapped[float] = mapped_column()
-    temp_r_i1: Mapped[float] = mapped_column()
-    temp_r_i2: Mapped[float] = mapped_column()
-    temp_r_e1: Mapped[float] = mapped_column()
-    temp_r_e2: Mapped[float] = mapped_column()
+    temp_feed_res: Mapped[float] = mapped_column()
+    temp_feed_pre: Mapped[float] = mapped_column()
+    temp_liq_reac: Mapped[float] = mapped_column()
+    temp_gas_reac_int: Mapped[float] = mapped_column()
+    temp_gas_reac_ext: Mapped[float] = mapped_column()
 
     # Sensors - Analog
-    pressure_feed: Mapped[float] = mapped_column()
-    pressure_reac: Mapped[float] = mapped_column()
-    flow_rate: Mapped[float] = mapped_column()
     h2_ppm: Mapped[float] = mapped_column()
     
     # New Columns
@@ -47,14 +42,14 @@ class LogMixin:
     pump_speed: Mapped[int] = mapped_column(default=0)
 
     # Actuators (Heater Duty Cycles)
-    heater_gas: Mapped[float] = mapped_column()
-    heater_vap: Mapped[float] = mapped_column()
-    heater_reac: Mapped[float] = mapped_column()
+    heater_feed_pre: Mapped[float] = mapped_column()
+    heater_liq_reac: Mapped[float] = mapped_column()
+    heater_gas_reac: Mapped[float] = mapped_column()
 
     # Setpoints
-    sp_gas: Mapped[float] = mapped_column()
-    sp_vap: Mapped[float] = mapped_column()
-    sp_reac: Mapped[float] = mapped_column()
+    sp_feed_pre: Mapped[float] = mapped_column()
+    sp_liq_reac: Mapped[float] = mapped_column()
+    sp_gas_reac: Mapped[float] = mapped_column()
 
 class Logs1s(Base, LogMixin):
     __tablename__ = "logs_1s"

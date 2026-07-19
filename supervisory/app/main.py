@@ -40,14 +40,9 @@ async def set_state(state_id: int):
 
 @app.post("/api/control/setpoint")
 async def set_setpoint(zone: int, value: float, rate: float = 0.0):
-    # Zone: 0=Gas, 1=Vap, 2=Reactor
+    # Zone: 0=Preheater, 1=Liquid, 2=Gas
     await orchestrator.send_setpoint(zone, value, rate)
     return {"status": "command_sent", "zone": zone, "value": value, "rate": rate}
-
-@app.post("/api/control/flow")
-async def set_flow(value: float):
-    await orchestrator.send_flow(value)
-    return {"status": "command_sent", "value": value}
 
 @app.post("/api/control/tare")
 async def tare_loadcell():
@@ -116,20 +111,21 @@ async def export_run(db: Session = Depends(get_db)):
     writer = csv.writer(output)
     
     # Header
-    writer.writerow(["Timestamp", "Uptime", "State", "Temp_Gas", "Temp_Feed", "Temp_Vap", "Temp_R_I1", "Temp_R_I2", "Weight", "Pump_Speed"])
+    writer.writerow(["Timestamp", "Uptime", "State", "Temp_Feed_Res", "Temp_Feed_Pre", "Temp_Liq_Reac", "Temp_Gas_Reac_Int", "Temp_Gas_Reac_Ext", "Weight", "Pump_Speed", "H2_ppm"])
     
     for log in logs:
         writer.writerow([
             log.timestamp.isoformat(),
             log.uptime,
             log.control_state,
-            log.temp_gas,
-            log.temp_feed,
-            log.temp_vap,
-            log.temp_r_i1,
-            log.temp_r_i2,
+            log.temp_feed_res,
+            log.temp_feed_pre,
+            log.temp_liq_reac,
+            log.temp_gas_reac_int,
+            log.temp_gas_reac_ext,
             log.weight,
-            log.pump_speed
+            log.pump_speed,
+            log.h2_ppm
         ])
         
     output.seek(0)

@@ -72,7 +72,7 @@ class Orchestrator:
                 ramp = self.ramps[zone]
                 # get current SP from telemetry to ensure we don't drift
                 # map zone index to telemetry key
-                keys = ["gas", "vap", "reac1", "reac2"]
+                keys = ["feed_pre", "liq_reac", "gas_reac"]
                 current_sp = data.get("sp", {}).get(keys[zone], 0.0)
                 
                 target = ramp["target"]
@@ -170,9 +170,6 @@ class Orchestrator:
 
     async def send_command_setpoint(self, zone: int, value: float):
          await serial_link.send_command({"cmd": "SET_TEMP", "zone": zone, "val": value})
-
-    async def send_flow(self, value: float):
-        await serial_link.send_command({"cmd": "SET_FLOW", "val": value})
 
     async def send_setpoint(self, zone: int, value: float, rate_min: float = 0.0):
         import time

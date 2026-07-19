@@ -16,26 +16,21 @@ def create_log(db: Session, data: dict, uptime: float, state: int):
         uptime=uptime,
         control_state=state,
         
-        temp_gas=s.get("t_gas", 0.0),
-        temp_feed=s.get("t_feed", 0.0),
-        temp_vap=s.get("t_vap", 0.0),
-        temp_r_i1=s.get("t_r_i1", 0.0),
-        temp_r_i2=s.get("t_r_i2", 0.0),
-        temp_r_e1=s.get("t_r_e1", 0.0),
-        temp_r_e2=s.get("t_r_e2", 0.0),
+        temp_feed_res=s.get("t_feed_res", 0.0),
+        temp_feed_pre=s.get("t_feed_pre", 0.0),
+        temp_liq_reac=s.get("t_liq_reac", 0.0),
+        temp_gas_reac_int=s.get("t_gas_reac_int", 0.0),
+        temp_gas_reac_ext=s.get("t_gas_reac_ext", 0.0),
         
-        pressure_feed=s.get("p_feed", 0.0),
-        pressure_reac=s.get("p_reac", 0.0),
-        flow_rate=s.get("flow", 0.0),
         h2_ppm=s.get("h2", 0.0),
         
-        heater_gas=h.get("gas", 0.0),
-        heater_vap=h.get("vap", 0.0),
-        heater_reac=h.get("reac", 0.0),
+        heater_feed_pre=h.get("feed_pre", 0.0),
+        heater_liq_reac=h.get("liq_reac", 0.0),
+        heater_gas_reac=h.get("gas_reac", 0.0),
         
-        sp_gas=sp.get("gas", 0.0),
-        sp_vap=sp.get("vap", 0.0),
-        sp_reac=sp.get("reac", 0.0),
+        sp_feed_pre=sp.get("feed_pre", 0.0),
+        sp_liq_reac=sp.get("liq_reac", 0.0),
+        sp_gas_reac=sp.get("gas_reac", 0.0),
         
         weight=s.get("weight", 0.0),
         pump_speed=pump.get("speed", 0)
@@ -71,10 +66,12 @@ def get_history_downsampled(db: Session, hours: int, max_points: int = 300):
             "state": log.control_state,
             "sensors": {
                 "weight": log.weight,
-                "t_gas": log.temp_gas,
-                "t_vap": log.temp_vap,
-                "t_r_i1": log.temp_r_i1,
-                "t_r_i2": log.temp_r_i2,
+                "t_feed_res": log.temp_feed_res,
+                "t_feed_pre": log.temp_feed_pre,
+                "t_liq_reac": log.temp_liq_reac,
+                "t_gas_reac_int": log.temp_gas_reac_int,
+                "t_gas_reac_ext": log.temp_gas_reac_ext,
+                "h2": log.h2_ppm,
             },
             "pump": {
                 "speed": log.pump_speed
@@ -87,16 +84,16 @@ from sqlalchemy import text
 def perform_1m_rollup(db: Session):
     sql = text("""
         INSERT INTO logs_1m (
-            timestamp, uptime, control_state, temp_gas, temp_feed, temp_vap,
-            temp_r_i1, temp_r_i2, temp_r_e1, temp_r_e2, pressure_feed, pressure_reac,
-            flow_rate, h2_ppm, weight, pump_speed, heater_gas, heater_vap, heater_reac,
-            sp_gas, sp_vap, sp_reac
+            timestamp, uptime, control_state, temp_feed_res, temp_feed_pre, temp_liq_reac,
+            temp_gas_reac_int, temp_gas_reac_ext, h2_ppm, weight, pump_speed,
+            heater_feed_pre, heater_liq_reac, heater_gas_reac,
+            sp_feed_pre, sp_liq_reac, sp_gas_reac
         )
         SELECT 
-            MAX(timestamp), AVG(uptime), MAX(control_state), AVG(temp_gas), AVG(temp_feed), AVG(temp_vap),
-            AVG(temp_r_i1), AVG(temp_r_i2), AVG(temp_r_e1), AVG(temp_r_e2), AVG(pressure_feed), AVG(pressure_reac),
-            AVG(flow_rate), AVG(h2_ppm), AVG(weight), AVG(pump_speed), AVG(heater_gas), AVG(heater_vap), AVG(heater_reac),
-            AVG(sp_gas), AVG(sp_vap), AVG(sp_reac)
+            MAX(timestamp), AVG(uptime), MAX(control_state), AVG(temp_feed_res), AVG(temp_feed_pre), AVG(temp_liq_reac),
+            AVG(temp_gas_reac_int), AVG(temp_gas_reac_ext), AVG(h2_ppm), AVG(weight), AVG(pump_speed),
+            AVG(heater_feed_pre), AVG(heater_liq_reac), AVG(heater_gas_reac),
+            AVG(sp_feed_pre), AVG(sp_liq_reac), AVG(sp_gas_reac)
         FROM logs_1s
         WHERE timestamp >= datetime('now', '-1 minute')
         HAVING MAX(timestamp) IS NOT NULL
@@ -107,16 +104,16 @@ def perform_1m_rollup(db: Session):
 def perform_10m_rollup(db: Session):
     sql = text("""
         INSERT INTO logs_10m (
-            timestamp, uptime, control_state, temp_gas, temp_feed, temp_vap,
-            temp_r_i1, temp_r_i2, temp_r_e1, temp_r_e2, pressure_feed, pressure_reac,
-            flow_rate, h2_ppm, weight, pump_speed, heater_gas, heater_vap, heater_reac,
-            sp_gas, sp_vap, sp_reac
+            timestamp, uptime, control_state, temp_feed_res, temp_feed_pre, temp_liq_reac,
+            temp_gas_reac_int, temp_gas_reac_ext, h2_ppm, weight, pump_speed,
+            heater_feed_pre, heater_liq_reac, heater_gas_reac,
+            sp_feed_pre, sp_liq_reac, sp_gas_reac
         )
         SELECT 
-            MAX(timestamp), AVG(uptime), MAX(control_state), AVG(temp_gas), AVG(temp_feed), AVG(temp_vap),
-            AVG(temp_r_i1), AVG(temp_r_i2), AVG(temp_r_e1), AVG(temp_r_e2), AVG(pressure_feed), AVG(pressure_reac),
-            AVG(flow_rate), AVG(h2_ppm), AVG(weight), AVG(pump_speed), AVG(heater_gas), AVG(heater_vap), AVG(heater_reac),
-            AVG(sp_gas), AVG(sp_vap), AVG(sp_reac)
+            MAX(timestamp), AVG(uptime), MAX(control_state), AVG(temp_feed_res), AVG(temp_feed_pre), AVG(temp_liq_reac),
+            AVG(temp_gas_reac_int), AVG(temp_gas_reac_ext), AVG(h2_ppm), AVG(weight), AVG(pump_speed),
+            AVG(heater_feed_pre), AVG(heater_liq_reac), AVG(heater_gas_reac),
+            AVG(sp_feed_pre), AVG(sp_liq_reac), AVG(sp_gas_reac)
         FROM logs_1m
         WHERE timestamp >= datetime('now', '-10 minutes')
         HAVING MAX(timestamp) IS NOT NULL
