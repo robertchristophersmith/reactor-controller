@@ -8,7 +8,6 @@
 // --- Global Objects ---
 SensorManager sensors;
 HeaterController heaters;
-FlowController flow;
 SerialComms comms;
 WeightedAverage wAvg1; // Zone 1
 WeightedAverage wAvg2; // Zone 2
@@ -39,9 +38,6 @@ void setup() {
 
   heaters.begin();
   // Serial.println("Heaters init done");
-
-  flow.begin();
-  // Serial.println("Flow init done");
 
   comms.begin();
   // Serial.println("Comms init done");
@@ -83,10 +79,7 @@ void loop() {
     case CMD_SET_STATE:
       currentState = (ControlState)cmd.state;
       break;
-    case CMD_SET_FLOW:
-      if (cmd.zone == 0)
-        flow.setFlow(cmd.value);
-      break;
+
     case CMD_HEARTBEAT:
       break;
     case CMD_TARE_LOADCELL:
@@ -135,7 +128,7 @@ void loop() {
     // E. Telemetry (1Hz)
     if (now - lastTelemetryTime >= 1000) {
       lastTelemetryTime = now;
-      comms.sendTelemetry(data, heaters, flow, currentState,
+      comms.sendTelemetry(data, heaters, currentState,
                           (now - startTime) / 1000);
     }
   }
@@ -180,29 +173,24 @@ void updateFSM(SensorData &data) {
   switch (currentState) {
   case STATE_STANDBY:
     heaters.setEnabled(false);
-    flow.setEnabled(false);
     break;
 
   case STATE_WARMUP:
     // TEMPORARILY DISABLED: "no actions are triggered"
     heaters.setEnabled(false);
-    flow.setEnabled(false); 
     break;
 
   case STATE_WORKING:
     // TEMPORARILY DISABLED: "no actions are triggered"
     heaters.setEnabled(false);
-    flow.setEnabled(false);
     break;
 
   case STATE_ALARM:
     heaters.setEnabled(false);
-    flow.setEnabled(false);
     break;
 
   case STATE_FAULT:
     heaters.setEnabled(false);
-    flow.setEnabled(false);
     break;
   }
 }

@@ -18,13 +18,10 @@ This guide provides instructions for setting up both the **embedded firmware** (
        - **Reactor Zone 2 (Bottom) External**: Connect CS to Mega **Pin 26**.
        - **Reactor Zone 2 (Bottom) Internal**: Connect CS to Mega **Pin 27**.
        - **Feedstock Temp**: Connect CS to Mega **Pin 28**.
-   - **I2C Bus Devices (ADS1115 ADCs and MCP4725 DAC)**:
-     - **Common Pins**: Connect the **SDA** pin of all I2C boards to Mega **Pin 20** (Hardware I2C SDA), and the **SCL** pin to Mega **Pin 21** (Hardware I2C SCL). Power all boards with **5V** (or 3.3V) and common **GND**.
-     - **I2C Address Configuration**:
-       - **ADS1115 (MFC Flow Feedback)**: Connect the **ADDR** pin to **GND** (I2C Address `0x48`).
-       - **ADS1115 (Pressure Transducer)**: Connect the **ADDR** pin to **VDD/VCC** (I2C Address `0x49`).
-       - **ADS1115 (Hydrogen/H2 Sensor)**: Connect the **ADDR** pin to **SDA** (I2C Address `0x4A`).
-       - **MCP4725 DAC (MFC Flow Control)**: Connect the **ADDR** or **A0** pin to **GND** (I2C Address `0x62`).
+    - **I2C Bus Devices (ADS1115 ADC)**:
+      - **Common Pins**: Connect the **SDA** pin of the I2C board to Mega **Pin 20** (Hardware I2C SDA), and the **SCL** pin to Mega **Pin 21** (Hardware I2C SCL). Power the board with **5V** (or 3.3V) and common **GND**.
+      - **I2C Address Configuration**:
+        - **ADS1115 (Hydrogen/H2 Sensor)**: Connect the **ADDR** pin to **SDA** (I2C Address `0x4A`).
    - **Load Cell Amplifier (HX711)**:
      - Connect the **DT** (Data) pin to Mega **Pin 3**.
      - Connect the **SCK** (Clock) pin to Mega **Pin 2**.

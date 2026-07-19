@@ -25,12 +25,9 @@
 #define PIN_SPI_CS_TC_REACTOR_INT_2 27  // Reactor Zone 2 (Bottom) Internal
 #define PIN_SPI_CS_TC_FEEDSTOCK 28      // Feedstock
 
-// --- I2C Bus (ADS1115, MCP4725) ---
+// --- I2C Bus (ADS1115) ---
 // Hardware I2C: SDA=20, SCL=21
-#define I2C_ADDR_ADS1115_MFC 0x48      // GND - MFC Feedback
-#define I2C_ADDR_ADS1115_PRESSURE 0x49 // VDD - Pressure Transducer
 #define I2C_ADDR_ADS1115_H2 0x4A       // SDA - Hydrogen Sensor
-#define I2C_ADDR_MFC_DAC 0x62          // Default Adafruit Address
 
 // --- Load Cell (HX711) ---
 #define PIN_HX711_SCK 2
@@ -47,15 +44,9 @@
 #define REG_SPEED 0x0105
 
 // --- ADS1115 Channel Map ---
-#define ADC_CH_MFC_FLOW_READ 0 // On ADS_MFC
-#define ADC_CH_PRESSURE 0      // On ADS_PRESSURE (0-30psig)
 #define ADC_CH_H2_SENSOR 2     // On ADS_H2 (MQ-8)
 
-// --- Flow Constants ---
-#define MFC_FLOW_MAX_SCCM 3000.0 // Full scale flow
-#define MFC_VOLTAGE_MIN 0.5
-#define MFC_VOLTAGE_MAX 4.5
-#define PRESSURE_MAX_PSIG 30.0
+// --- Constants ---
 #define H2_MAX_PERCENT 100.0
 
 // --- Actuators (Heaters - SSRs) ---

@@ -34,14 +34,7 @@ Command SerialComms::checkCommand() {
         } else if (strcmp(typeStr, "SET_STATE") == 0) {
           cmd.type = CMD_SET_STATE;
           cmd.state = doc["state"];
-        } else if (strcmp(typeStr, "SET_FLOW") == 0) {
-          cmd.type = CMD_SET_FLOW;
-          cmd.value = doc["val"];
-          if (doc.containsKey("id")) {
-            cmd.zone = doc["id"];
-          } else {
-            cmd.zone = 0; // Default to MFC
-          }
+
         } else if (strcmp(typeStr, "HEARTBEAT") == 0) {
           cmd.type = CMD_HEARTBEAT;
         } else if (strcmp(typeStr, "TARE_LOADCELL") == 0) {
@@ -70,7 +63,7 @@ Command SerialComms::checkCommand() {
 }
 
 void SerialComms::sendTelemetry(const SensorData &sensors,
-                                HeaterController &heaters, FlowController &flow,
+                                HeaterController &heaters,
                                 ControlState state, unsigned long uptime) {
   StaticJsonDocument<512> doc;
 
@@ -95,7 +88,6 @@ void SerialComms::sendTelemetry(const SensorData &sensors,
   sp["vap"] = heaters.getSetpointVaporizer();
   sp["reac1"] = heaters.getSetpointReactor1();
   sp["reac2"] = heaters.getSetpointReactor2();
-  sp["flow"] = flow.getSetpoint();
 
   serializeJson(doc, Serial);
   Serial.println();

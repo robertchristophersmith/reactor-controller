@@ -1,7 +1,6 @@
 #ifndef SERIAL_COMMS_H
 #define SERIAL_COMMS_H
 
-#include "FlowController.h"
 #include "HeaterController.h"
 #include "SensorManager.h"
 #include <Arduino.h>
@@ -12,7 +11,6 @@ enum CommandType {
   CMD_SET_TEMP,
   CMD_SET_STATE,
   CMD_HEARTBEAT,
-  CMD_SET_FLOW,
   CMD_TARE_LOADCELL,
   CMD_CALIBRATE_LOADCELL,
   CMD_PUMP_CONTROL
@@ -39,8 +37,7 @@ public:
   void begin();
   Command checkCommand();
   void sendTelemetry(const SensorData &sensors, HeaterController &heaters,
-                     FlowController &flow, ControlState state,
-                     unsigned long uptime);
+                     ControlState state, unsigned long uptime);
   void sendError(const String &msg);
 
 private:
