@@ -149,7 +149,7 @@
                     </div>
 
                     {/* Process Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {/* Feedstock Pump */}
                         <PumpCard pump={latest.pump} />
 
@@ -157,6 +157,33 @@
                         <LoadCellCard weight={s.weight} 
                             onTare={() => fetch('/api/control/tare', { method: 'POST' })}
                             onCalibrate={(w) => fetch(`/api/control/calibrate?value=${w}`, { method: 'POST' })} />
+
+                        {/* H2 Sensor */}
+                        <SensorCard title="H2 Sensor" value={s.h2} unit="ppm" color="text-pink-400" border="border-pink-500" />
+                    </div>
+
+                    {/* Temperature Controls */}
+                    <h2 className="text-xl font-bold text-gray-300 mt-4 mb-1">Thermal Control</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Feedstock Reservoir */}
+                        <SensorCard title="Feedstock Reservoir" value={s.t_feed_res} unit="°C" color="text-teal-400" border="border-teal-500" />
+
+                        {/* Feedstock Preheater */}
+                        <ZoneCard title="Feedstock Preheater"
+                            temp={s.t_feed_pre} sp={sp.feed_pre} out={h.feed_pre}
+                            onSetSp={(v, r) => sendSetpoint(0, v, r)} />
+
+                        {/* Liquid Reactor */}
+                        <ZoneCard title="Liquid Reactor"
+                            temp={s.t_liq_reac} sp={sp.liq_reac} out={h.liq_reac}
+                            onSetSp={(v, r) => sendSetpoint(1, v, r)} />
+
+                        {/* Gas Reactor */}
+                        <ZoneCard title="Gas Reactor"
+                            temp={s.t_gas_reac_int * 0.7 + s.t_gas_reac_ext * 0.3}
+                            sub={`Int: ${s.t_gas_reac_int}°C | Ext: ${s.t_gas_reac_ext}°C`}
+                            sp={sp.gas_reac} out={h.gas_reac}
+                            onSetSp={(v, r) => sendSetpoint(2, v, r)} />
                     </div>
 
                     {/* Chart */}
@@ -182,6 +209,11 @@
                                 <Legend />
                                 <Line yAxisId="left" type="monotone" dataKey="sensors.weight" stroke="#14B8A6" dot={false} name="Weight (Kg)" />
                                 <Line yAxisId="right" type="stepAfter" dataKey="pump.speed" stroke="#818CF8" dot={false} name="Pump Speed" />
+                                <Line yAxisId="right" type="monotone" dataKey="sensors.t_feed_res" stroke="#2DD4BF" dot={false} name="Feed Res (°C)" />
+                                <Line yAxisId="right" type="monotone" dataKey="sensors.t_feed_pre" stroke="#FBBF24" dot={false} name="Feed Pre (°C)" />
+                                <Line yAxisId="right" type="monotone" dataKey="sensors.t_liq_reac" stroke="#EF4444" dot={false} name="Liq Reac (°C)" />
+                                <Line yAxisId="right" type="monotone" dataKey="sensors.t_gas_reac_int" stroke="#A78BFA" dot={false} name="Gas Int (°C)" />
+                                <Line yAxisId="right" type="monotone" dataKey="sensors.t_gas_reac_ext" stroke="#6366F1" dot={false} name="Gas Ext (°C)" />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
