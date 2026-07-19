@@ -7,18 +7,15 @@ import time
 uptime = 0
 state = 0  # 0=Standby, 1=Warmup, 2=Working
 weight = 5.0
-sp_gas = 0.0
-sp_vap = 0.0
-sp_reac1 = 0.0
-sp_reac2 = 0.0
-sp_flow = 0.0
+sp_feed_pre = 0.0
+sp_liq_reac = 0.0
+sp_gas_reac = 0.0
 
-temp_gas = 25.0
-temp_vap = 25.0
-temp_reac1_int = 25.0
-temp_reac1_ext = 25.0
-temp_reac2_int = 25.0
-temp_reac2_ext = 25.0
+temp_feed_res = 25.0
+temp_feed_pre = 25.0
+temp_liq_reac = 25.0
+temp_gas_reac_int = 25.0
+temp_gas_reac_ext = 25.0
 
 pump_running = False
 pump_dir = 0
@@ -27,32 +24,25 @@ pump_speed = 0
 clients = set()
 
 async def simulation_loop():
-    global uptime, weight, temp_gas, temp_vap, temp_reac1_int, temp_reac1_ext, temp_reac2_int, temp_reac2_ext
+    global uptime, weight, temp_feed_pre, temp_liq_reac, temp_gas_reac_int, temp_gas_reac_ext
     while True:
         await asyncio.sleep(1)
         uptime += 1
         
         # 1. Temperature Simulation
         if state in [1, 2]:  # Warmup or Working
-            temp_gas += (sp_gas - temp_gas) * 0.1
-            temp_vap += (sp_vap - temp_vap) * 0.1
-            temp_reac1_int += (sp_reac1 - temp_reac1_int) * 0.08
-            temp_reac1_ext += (sp_reac1 - temp_reac1_ext) * 0.05
-            temp_reac2_int += (sp_reac2 - temp_reac2_int) * 0.08
-            temp_reac2_ext += (sp_reac2 - temp_reac2_ext) * 0.05
+            temp_feed_pre += (sp_feed_pre - temp_feed_pre) * 0.1
+            temp_liq_reac += (sp_liq_reac - temp_liq_reac) * 0.08
+            temp_gas_reac_int += (sp_gas_reac - temp_gas_reac_int) * 0.08
+            temp_gas_reac_ext += ((temp_gas_reac_int - temp_gas_reac_ext) * 0.1 - (temp_gas_reac_ext - 25.0) * 0.01)
         else:
             # Cool down to ambient (25.0)
-            temp_gas += (25.0 - temp_gas) * 0.02
-            temp_vap += (25.0 - temp_vap) * 0.02
-            temp_reac1_int += (25.0 - temp_reac1_int) * 0.02
-            temp_reac1_ext += (25.0 - temp_reac1_ext) * 0.02
-            temp_reac2_int += (25.0 - temp_reac2_int) * 0.02
-            temp_reac2_ext += (25.0 - temp_reac2_ext) * 0.02
+            temp_feed_pre += (25.0 - temp_feed_pre) * 0.02
+            temp_liq_reac += (25.0 - temp_liq_reac) * 0.02
+            temp_gas_reac_int += (25.0 - temp_gas_reac_int) * 0.02
+            temp_gas_reac_ext += (25.0 - temp_gas_reac_ext) * 0.02
 
         # 2. Weight Simulation
-        weight_drain = (sp_flow / 100.0) * 0.01
-        weight -= weight_drain
-        
         if pump_running:
             pump_flow = (pump_speed / 99.0) * 0.05
             if pump_dir == 0:  # FWD
@@ -64,25 +54,29 @@ async def simulation_loop():
             weight = 0.0
 
         # 3. Broadcast Telemetry
+        gas_weighted = temp_gas_reac_int * 0.7 + temp_gas_reac_ext * 0.3
         telemetry = {
             "uptime": uptime,
             "state": state,
             "sensors": {
                 "status": 0,
-                "weight": round(weight, 3)
+                "weight": round(weight, 3),
+                "t_feed_res": round(temp_feed_res, 1),
+                "t_feed_pre": round(temp_feed_pre, 1),
+                "t_liq_reac": round(temp_liq_reac, 1),
+                "t_gas_reac_int": round(temp_gas_reac_int, 1),
+                "t_gas_reac_ext": round(temp_gas_reac_ext, 1),
+                "h2": 0.0
             },
             "heaters": {
-                "gas": round(100.0 if temp_gas < sp_gas else 0.0, 1),
-                "vap": round(100.0 if temp_vap < sp_vap else 0.0, 1),
-                "reac1": round(100.0 if temp_reac1_int < sp_reac1 else 0.0, 1),
-                "reac2": round(100.0 if temp_reac2_int < sp_reac2 else 0.0, 1)
+                "feed_pre": round(100.0 if temp_feed_pre < sp_feed_pre else 0.0, 1),
+                "liq_reac": round(100.0 if temp_liq_reac < sp_liq_reac else 0.0, 1),
+                "gas_reac": round(100.0 if gas_weighted < sp_gas_reac else 0.0, 1)
             },
             "sp": {
-                "gas": sp_gas,
-                "vap": sp_vap,
-                "reac1": sp_reac1,
-                "reac2": sp_reac2,
-                "flow": sp_flow
+                "feed_pre": sp_feed_pre,
+                "liq_reac": sp_liq_reac,
+                "gas_reac": sp_gas_reac
             }
         }
         
@@ -114,7 +108,6 @@ async def monitor_pump():
                 except Exception:
                     pass
         except Exception as e:
-            # print(f"Sensor Emulator failed to connect to Pump Emulator: {e}. Retrying in 2s...")
             await asyncio.sleep(2)
 
 async def handle_client(reader, writer):
@@ -131,26 +124,21 @@ async def handle_client(reader, writer):
             try:
                 cmd = json.loads(decoded)
                 cmd_type = cmd.get("cmd")
-                global state, sp_gas, sp_vap, sp_reac1, sp_reac2, sp_flow, weight
+                global state, sp_feed_pre, sp_liq_reac, sp_gas_reac, weight
                 if cmd_type == "SET_TEMP":
                     zone = cmd.get("zone")
                     val = cmd.get("val", 0.0)
                     if zone == 0:
-                        sp_gas = val
+                        sp_feed_pre = val
                     elif zone == 1:
-                        sp_vap = val
+                        sp_liq_reac = val
                     elif zone == 2:
-                        sp_reac1 = val
-                    elif zone == 3:
-                        sp_reac2 = val
+                        sp_gas_reac = val
                 elif cmd_type == "SET_STATE":
                     state = cmd.get("state", 0)
-                elif cmd_type == "SET_FLOW":
-                    sp_flow = cmd.get("val", 0.0)
                 elif cmd_type == "TARE_LOADCELL":
                     weight = 0.0
                 elif cmd_type == "CALIBRATE_LOADCELL":
-                    # For simulation, setting calibrate is a no-op or aligns weight to the calibration value
                     pass
             except Exception as e:
                 print(f"Error parsing command: {e}")

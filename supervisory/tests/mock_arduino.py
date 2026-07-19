@@ -9,27 +9,21 @@ PORT = 9999
 
 class MockReactor:
     def __init__(self):
-        self.temp_gas = 25.0
-        self.temp_vap = 25.0
-        
-        self.temp_reac_1_int = 25.0
-        self.temp_reac_1_ext = 25.0
-        self.temp_reac_2_int = 25.0
-        self.temp_reac_2_ext = 25.0
+        self.temp_feed_res = 25.0
+        self.temp_feed_pre = 25.0
+        self.temp_liq_reac = 25.0
+        self.temp_gas_reac_int = 25.0
+        self.temp_gas_reac_ext = 25.0
 
-        self.sp_gas = 0.0
-        self.sp_vap = 0.0
-        self.sp_reac_1 = 0.0
-        self.sp_reac_2 = 0.0
+        self.sp_feed_pre = 0.0
+        self.sp_liq_reac = 0.0
+        self.sp_gas_reac = 0.0
         
         self.state = 0 # 0=Standby
         self.uptime = 0
-        self.heater_gas = 0.0
-        self.heater_vap = 0.0
-        self.heater_reac_1 = 0.0
-        self.heater_reac_2 = 0.0
-        self.mfc_sp = 0.0
-        self.mfc_flow = 0.0
+        self.heater_feed_pre = 0.0
+        self.heater_liq_reac = 0.0
+        self.heater_gas_reac = 0.0
         
         self.start_time = time.time()
 
@@ -40,70 +34,55 @@ class MockReactor:
         # Simple thermal simulation
         # Heating
         if self.state in [1, 2]: # Warmup or Working
-            # Simple P-control simulation for heater duty
-            self.heater_gas = max(0, min(1000, (self.sp_gas - self.temp_gas) * 10))
-            self.heater_vap = max(0, min(1000, (self.sp_vap - self.temp_vap) * 10))
+            self.heater_feed_pre = max(0, min(1000, (self.sp_feed_pre - self.temp_feed_pre) * 10))
+            self.heater_liq_reac = max(0, min(1000, (self.sp_liq_reac - self.temp_liq_reac) * 15))
             
-            # Reactor 1 Control
-            pv1 = (self.temp_reac_1_int + self.temp_reac_1_ext) / 2.0
-            self.heater_reac_1 = max(0, min(1000, (self.sp_reac_1 - pv1) * 30))
-
-            # Reactor 2 Control
-            pv2 = (self.temp_reac_2_int + self.temp_reac_2_ext) / 2.0
-            self.heater_reac_2 = max(0, min(1000, (self.sp_reac_2 - pv2) * 30))
-            
-            # Flow simulation (fast response)
-            # Move 10% towards setpoint per tick
-            self.mfc_flow += (self.mfc_sp - self.mfc_flow) * 0.5
+            # Gas average control (70% int / 30% ext)
+            gas_weighted = self.temp_gas_reac_int * 0.7 + self.temp_gas_reac_ext * 0.3
+            self.heater_gas_reac = max(0, min(1000, (self.sp_gas_reac - gas_weighted) * 20))
         else:
-             self.heater_gas = 0; self.heater_vap = 0
-             self.heater_reac_1 = 0; self.heater_reac_2 = 0
-             self.mfc_flow = 0 # Flow cuts off
+             self.heater_feed_pre = 0
+             self.heater_liq_reac = 0
+             self.heater_gas_reac = 0
 
         # Temp rise/fall (Newton's cooling law approx)
-        self.temp_gas += (self.heater_gas/1000.0 * 40.0 - (self.temp_gas - 25.0) * 0.05) * dt
-        self.temp_vap += (self.heater_vap/1000.0 * 40.0 - (self.temp_vap - 25.0) * 0.05) * dt
+        self.temp_feed_res = 25.0  # Feedstock reservoir is not heated, stays ambient
+        self.temp_feed_pre += (self.heater_feed_pre/1000.0 * 40.0 - (self.temp_feed_pre - 25.0) * 0.05) * dt
+        self.temp_liq_reac += (self.heater_liq_reac/1000.0 * 30.0 - (self.temp_liq_reac - 25.0) * 0.02) * dt
         
-        # Reactor 1 Dynamics (Int heats fast, Ext lags)
-        self.temp_reac_1_int += (self.heater_reac_1/1000.0 * 30.0 - (self.temp_reac_1_int - 25.0) * 0.02) * dt
-        self.temp_reac_1_ext += ((self.temp_reac_1_int - self.temp_reac_1_ext) * 0.1 - (self.temp_reac_1_ext - 25.0) * 0.01) * dt
-
-        # Reactor 2 Dynamics
-        self.temp_reac_2_int += (self.heater_reac_2/1000.0 * 30.0 - (self.temp_reac_2_int - 25.0) * 0.02) * dt
-        self.temp_reac_2_ext += ((self.temp_reac_2_int - self.temp_reac_2_ext) * 0.1 - (self.temp_reac_2_ext - 25.0) * 0.01) * dt
+        # Gas phase reactor internal and external dynamics
+        self.temp_gas_reac_int += (self.heater_gas_reac/1000.0 * 30.0 - (self.temp_gas_reac_int - 25.0) * 0.02) * dt
+        self.temp_gas_reac_ext += ((self.temp_gas_reac_int - self.temp_gas_reac_ext) * 0.1 - (self.temp_gas_reac_ext - 25.0) * 0.01) * dt
         
         # Noise
-        self.temp_gas += random.uniform(-0.1, 0.1)
+        self.temp_feed_pre += random.uniform(-0.1, 0.1)
 
     def get_telemetry(self):
         return {
             "uptime": int(self.uptime),
             "state": self.state,
             "sensors": {
-                "t_gas": round(self.temp_gas, 1),
-                "t_feed": round(self.temp_gas * 0.9, 1),
-                "t_vap": round(self.temp_vap, 1),
-                "t_r_i1": round(self.temp_reac_1_int, 1),
-                "t_r_e1": round(self.temp_reac_1_ext, 1),
-                "t_r_i2": round(self.temp_reac_2_int, 1),
-                "t_r_e2": round(self.temp_reac_2_ext, 1),
-                "p_feed": 0.0, # Gauge Pressure
+                "t_feed_res": round(self.temp_feed_res, 1),
+                "t_feed_pre": round(self.temp_feed_pre, 1),
+                "t_liq_reac": round(self.temp_liq_reac, 1),
+                "t_gas_reac_int": round(self.temp_gas_reac_int, 1),
+                "t_gas_reac_ext": round(self.temp_gas_reac_ext, 1),
+                "p_feed": 0.0,
                 "p_reac": 0.0,
-                "flow": round(self.mfc_flow, 1),
-                "h2": 0.5 # 0% (0.5V)
+                "flow": 0.0,
+                "h2": 0.0,
+                "weight": 5.0,
+                "status": 0
             },
             "heaters": {
-                "gas": int(self.heater_gas),
-                "vap": int(self.heater_vap),
-                "reac1": int(self.heater_reac_1),
-                "reac2": int(self.heater_reac_2)
+                "feed_pre": int(self.heater_feed_pre),
+                "liq_reac": int(self.heater_liq_reac),
+                "gas_reac": int(self.heater_gas_reac)
             },
             "sp": {
-                "gas": self.sp_gas,
-                "vap": self.sp_vap,
-                "reac1": self.sp_reac_1,
-                "reac2": self.sp_reac_2,
-                "flow": self.mfc_sp
+                "feed_pre": self.sp_feed_pre,
+                "liq_reac": self.sp_liq_reac,
+                "gas_reac": self.sp_gas_reac
             }
         }
 
@@ -115,28 +94,19 @@ class MockReactor:
                 print(f"MOCK: State set to {self.state}")
             except:
                 print(f"MOCK ERROR: Invalid state value {cmd.get('state')}")
-        elif cmd.get("cmd") == "SET_FLOW":
-            val = cmd.get("val")
-            print(f"MOCK: Setting Flow Setpoint to {val}")
-            self.mfc_sp = val
         elif cmd.get("cmd") == "SET_TEMP":
             z = cmd.get("zone")
             v = cmd.get("val")
-            if z == 0: self.sp_gas = v
-            if z == 1: self.sp_vap = v
-            if z == 2: self.sp_reac_1 = v
-            if z == 3: self.sp_reac_2 = v
+            if z == 0: self.sp_feed_pre = v
+            if z == 1: self.sp_liq_reac = v
+            if z == 2: self.sp_gas_reac = v
 
 async def handle_client(reader, writer):
     print("Client Connected")
     reactor = MockReactor()
     
-    # Send loop
     try:
         while True:
-            # Check for incoming commands (non-blocking read would be ideal, but asyncio...)
-            # We'll rely on reader task
-            
             # Send Telemetry (1Hz)
             reactor.update()
             if int(reactor.uptime * 10) % 10 == 0: # Approx 1Hz send
@@ -146,7 +116,6 @@ async def handle_client(reader, writer):
             
             # Read Check
             try:
-                # Use wait_for with small timeout to poll
                 data = await asyncio.wait_for(reader.readline(), timeout=0.1)
                 if data:
                     try:
@@ -154,10 +123,6 @@ async def handle_client(reader, writer):
                         reactor.handle_command(cmd)
                     except Exception as e:
                         print(f"JSON Error: {e}")
-                else:
-                    # EOF
-                    # print("EOF received") # Optional
-                    pass
             except asyncio.TimeoutError:
                 pass
                 

@@ -31,13 +31,13 @@ def get_latest_telemetry():
 def test():
     print("Testing Dual-Zone Control...")
     
-    # Set Zone 2 (Reactor 1) to 123.4
-    print("Setting Zone 2 (Reac 1) to 123.4")
-    send_setpoint(2, 123.4)
+    # Set Zone 1 (Liquid phase reactor) to 123.4
+    print("Setting Zone 1 (Liquid) to 123.4")
+    send_setpoint(1, 123.4)
     
-    # Set Zone 3 (Reactor 2) to 567.8
-    print("Setting Zone 3 (Reac 2) to 567.8")
-    send_setpoint(3, 567.8)
+    # Set Zone 2 (Gas phase reactor) to 234.5
+    print("Setting Zone 2 (Gas) to 234.5")
+    send_setpoint(2, 234.5)
     
     # Wait for telemetry update
     print("Waiting for telemetry...")
@@ -47,21 +47,21 @@ def test():
     if not telemetry:
         print("FAIL: No telemetry received")
         return
-
+ 
     sp = telemetry.get("sp", {})
-    reac1_sp = sp.get("reac1")
-    reac2_sp = sp.get("reac2")
+    liq_sp = sp.get("liq_reac")
+    gas_sp = sp.get("gas_reac")
     
-    print(f"Telemetry SP Reac1: {reac1_sp}")
-    print(f"Telemetry SP Reac2: {reac2_sp}")
+    print(f"Telemetry SP Liquid: {liq_sp}")
+    print(f"Telemetry SP Gas: {gas_sp}")
     
     success = True
-    if reac1_sp != 123.4:
-        print("FAIL: Zone 2 Setpoint invalid")
+    if liq_sp != 123.4:
+        print("FAIL: Zone 1 (Liquid) Setpoint invalid")
         success = False
     
-    if reac2_sp != 567.8:
-        print("FAIL: Zone 3 Setpoint invalid")
+    if gas_sp != 234.5:
+        print("FAIL: Zone 2 (Gas) Setpoint invalid")
         success = False
         
     if success:

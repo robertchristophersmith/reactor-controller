@@ -19,11 +19,6 @@ def test_setpoint(zone, val, rate=0):
     url = f"{BASE_URL}/api/control/setpoint?zone={zone}&value={val}&rate={rate}"
     post_req(url)
 
-def test_flow(val):
-    print(f"Testing Flow -> {val}")
-    url = f"{BASE_URL}/api/control/flow?value={val}"
-    post_req(url)
-
 def start_warmup():
     print("Setting State to WARMUP")
     url = f"{BASE_URL}/api/control/state/1"
@@ -37,7 +32,7 @@ def get_history():
             if len(data) > 0:
                 # Print just a summary to avoid spam
                 latest = data[-1]
-                print(f"Latest Telemetry - Flow: {latest.get('sensors', {}).get('flow')} SP: {latest.get('sp', {}).get('flow')}")
+                print(f"Latest Telemetry - Preheater SP: {latest.get('sp', {}).get('feed_pre')} Liquid SP: {latest.get('sp', {}).get('liq_reac')} Gas SP: {latest.get('sp', {}).get('gas_reac')}")
             else:
                 print("No history yet.")
     except Exception as e:
@@ -48,13 +43,13 @@ if __name__ == "__main__":
     start_warmup()
     time.sleep(1)
     
-    test_flow(50.0)
-    time.sleep(1)
-    
     test_setpoint(0, 100.0)
     time.sleep(1)
     
     test_setpoint(1, 200.0, rate=60.0)
+    time.sleep(1)
+
+    test_setpoint(2, 300.0)
     
     print("--- Polling History ---")
     for i in range(5):
