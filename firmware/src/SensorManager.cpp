@@ -18,6 +18,7 @@ SensorManager::SensorManager() {
   _tcGasReactorExt = new Adafruit_MAX31855(PIN_SPI_CS_TC_GAS_REACTOR_EXT);
 }
 
+void SensorManager::begin() {
   // Initialize Chip Selects
   pinMode(PIN_SPI_CS_TC_FEEDSTOCK_RESERVOIR, OUTPUT);
   pinMode(PIN_SPI_CS_TC_FEEDSTOCK_PREHEATER, OUTPUT);
