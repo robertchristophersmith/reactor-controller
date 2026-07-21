@@ -21,6 +21,7 @@
 #define PIN_SPI_CS_TC_FEEDSTOCK_PREHEATER 22  // External feedstock preheater
 #define PIN_SPI_CS_TC_LIQUID_REACTOR 25       // Internal liquid phase reactor
 #define PIN_SPI_CS_TC_GAS_REACTOR_INT 27      // Internal gas phase reactor
+#define PIN_SPI_CS_TC_GAS_REACTOR_EXT 26      // External gas phase reactor
 // --- Analog Inputs ---
 #define PIN_H2_SENSOR A0 // MQ-8 Hydrogen Sensor (Analog Out)
 
