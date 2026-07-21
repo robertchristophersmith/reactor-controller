@@ -21,11 +21,8 @@
 #define PIN_SPI_CS_TC_FEEDSTOCK_PREHEATER 22  // External feedstock preheater
 #define PIN_SPI_CS_TC_LIQUID_REACTOR 25       // Internal liquid phase reactor
 #define PIN_SPI_CS_TC_GAS_REACTOR_INT 27      // Internal gas phase reactor
-#define PIN_SPI_CS_TC_GAS_REACTOR_EXT 26      // External gas phase reactor
-
-// --- I2C Bus (ADS1115) ---
-// Hardware I2C: SDA=20, SCL=21
-#define I2C_ADDR_ADS1115_H2 0x4A       // SDA - Hydrogen Sensor
+// --- Analog Inputs ---
+#define PIN_H2_SENSOR A0 // MQ-8 Hydrogen Sensor (Analog Out)
 
 // --- Load Cell (HX711) ---
 #define PIN_HX711_SCK 2
@@ -40,9 +37,6 @@
 #define REG_CONTINUOUS_MODE 0x0101
 #define REG_ACCEL_DECEL 0x0104
 #define REG_SPEED 0x0105
-
-// --- ADS1115 Channel Map ---
-#define ADC_CH_H2_SENSOR 2     // On ADS_H2 (MQ-8)
 
 // --- Constants ---
 #define H2_MAX_PERCENT 100.0

@@ -49,42 +49,8 @@ void SensorManager::begin() {
   // Slow down SPI to ~500kHz (16MHz / 32) for stability
   SPI.setClockDivider(SPI_CLOCK_DIV32);
 
-  // Initialize ADCs
-  // Initialize ADCs
-  Serial.println("Init: ADCs starting...");
-
-  // Initialize Wire manually to set timeout to prevent hangs
-  Wire.begin();
-  // Set timeout to 3000us (3ms) and reset_on_timeout=true
-  Wire.setWireTimeout(3000, true);
-
-  // DISABLE I2C SENSORS
-  // Serial.println("Init: MFC ADS1115... DISABLED");
-  /*
-  if (!_adsMFC.begin(I2C_ADDR_ADS1115_MFC)) {
-    Serial.println("Failed: ADS MFC");
-  } else {
-    Serial.println("OK: ADS MFC");
-  }
-  */
-
-  // Serial.println("Init: Pressure ADS1115... DISABLED");
-  /*
-  if (!_adsPressure.begin(I2C_ADDR_ADS1115_PRESSURE)) {
-    Serial.println("Failed: ADS Pressure");
-  } else {
-    Serial.println("OK: ADS Pressure");
-  }
-  */
-
-  // Serial.println("Init: H2 ADS1115... DISABLED");
-  /*
-  if (!_adsH2.begin(I2C_ADDR_ADS1115_H2)) {
-    Serial.println("Failed: ADS H2");
-  } else {
-    Serial.println("OK: ADS H2");
-  }
-  */
+  // Initialize Analog H2 Sensor Pin
+  pinMode(PIN_H2_SENSOR, INPUT);
 
   // Initialize HX711
   Serial.println("Init: HX711 Load Cell...");
@@ -162,7 +128,10 @@ void SensorManager::update() {
     _currentData.sensorsHealthy = true;
   }
 
-  _currentData.h2ConcentrationPpm = 0.0;
+  // Read Analog H2 Sensor (MQ-8)
+  int rawH2 = analogRead(PIN_H2_SENSOR);
+  float voltageH2 = rawH2 * (5.0f / 1023.0f);
+  _currentData.h2ConcentrationPpm = voltageH2 * 1000.0f; // Scale 0-5V to 0-5000 ppm estimation
 
   // Read Load Cell
   if (_hx711.is_ready()) {

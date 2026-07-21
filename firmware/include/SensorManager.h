@@ -2,11 +2,9 @@
 #define SENSOR_MANAGER_H
 
 #include "config.h"
-#include <Adafruit_ADS1X15.h>
 #include <Adafruit_MAX31855.h>
 #include <Arduino.h>
 #include <SPI.h>
-#include <Wire.h>
 #include <stdint.h>
 #include <HX711.h>
 
@@ -54,9 +52,6 @@ private:
   Adafruit_MAX31855 *_tcLiquidReactor;
   Adafruit_MAX31855 *_tcGasReactorInt;
   Adafruit_MAX31855 *_tcGasReactorExt;
-
-  // ADC Objects
-  Adafruit_ADS1115 _adsH2;
 
   HX711 _hx711;
 
