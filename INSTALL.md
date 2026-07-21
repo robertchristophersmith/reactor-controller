@@ -17,7 +17,7 @@ This guide provides instructions for setting up both the **embedded firmware** (
        - **Internal Gas Phase Reactor**: Connect CS to Mega **Pin 27**.
        - **External Gas Phase Reactor**: Connect CS to Mega **Pin 26**.
     - **Analog Hydrogen Sensor (MQ-8)**:
-      - Connect the **AO** (Analog Output) pin to Mega **Pin A0**.
+      - Connect the sensor's **AO** (Analog Output) pin to Mega **Analog Input Pin A0**.
       - Power the sensor board with **5V** and common **GND**.
    - **Load Cell Amplifier (HX711)**:
      - Connect the **DT** (Data) pin to Mega **Pin 3**.
