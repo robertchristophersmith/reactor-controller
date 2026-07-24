@@ -48,6 +48,14 @@ async def set_setpoint(zone: int, value: float, rate: float = 0.0):
 async def silence_alarm():
     return orchestrator.silence_alarms()
 
+@app.get("/api/config/alarms")
+async def get_alarm_config():
+    return orchestrator.get_alarm_config()
+
+@app.post("/api/config/alarms")
+async def update_alarm_config(config: dict):
+    return orchestrator.update_alarm_config(config)
+
 @app.post("/api/control/tare")
 async def tare_loadcell():
     await orchestrator.send_tare()

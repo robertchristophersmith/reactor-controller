@@ -4,6 +4,9 @@ from .serial_interface import serial_link
 from .database import SessionLocal, init_db
 from .crud import create_log
 import logging
+import os
+import json
+import math
 from .motor_controller import motor_controller
 import time
 from .config import settings
@@ -20,7 +23,11 @@ class Orchestrator:
         self.ramps = {} # {zone: {target: float, rate_per_sec: float, last_update: float}}
         self.subscribers = set() # WebSocket queues
 
-        # Alarm State & Buzzer Relay Setup
+        # Alarm State & Config Setup
+        self.config_path = os.path.join(os.path.dirname(__file__), "alarm_config.json")
+        self.alarm_config = self.load_alarm_config()
+        self.tc_offline_start = {} # { "t_feed_res": timestamp, ... }
+
         self.active_alarms = []
         self.silence_until = 0.0
         self.muted_alarms_during_silence = []
@@ -65,17 +72,55 @@ class Orchestrator:
         self.auto_task = None
         self.poll_task = None
 
+    def load_alarm_config(self):
+        defaults = {
+            "preheater": {"low": 100.0, "high": 180.0},
+            "liquid": {"low": 170.0, "high": 220.0},
+            "gas": {"low": 180.0, "high": 270.0}
+        }
+        if os.path.exists(self.config_path):
+            try:
+                with open(self.config_path, "r") as f:
+                    data = json.load(f)
+                    for zone in defaults:
+                        if zone in data:
+                            defaults[zone]["low"] = float(data[zone].get("low", defaults[zone]["low"]))
+                            defaults[zone]["high"] = float(data[zone].get("high", defaults[zone]["high"]))
+            except Exception as e:
+                logger.error(f"Error loading alarm_config.json: {e}")
+        else:
+            self.save_alarm_config(defaults)
+        return defaults
+
+    def save_alarm_config(self, cfg):
+        try:
+            with open(self.config_path, "w") as f:
+                json.dump(cfg, f, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving alarm_config.json: {e}")
+
+    def get_alarm_config(self):
+        return self.alarm_config
+
+    def update_alarm_config(self, new_cfg):
+        for zone in ["preheater", "liquid", "gas"]:
+            if zone in new_cfg:
+                if "low" in new_cfg[zone]:
+                    self.alarm_config[zone]["low"] = float(new_cfg[zone]["low"])
+                if "high" in new_cfg[zone]:
+                    self.alarm_config[zone]["high"] = float(new_cfg[zone]["high"])
+        self.save_alarm_config(self.alarm_config)
+        logger.info(f"Updated alarm config: {self.alarm_config}")
+        return self.alarm_config
+
     def silence_alarms(self):
         self.silence_until = time.time() + 300.0  # 5 minutes
-        self.silence_snapshot_codes = {a["code"] for a in self.active_alarms}
-        self.muted_alarms_during_silence = []
         if self.buzzer_relay:
             self.buzzer_relay.off()
         logger.info("Alarms silenced for 5 minutes.")
         return {
             "status": "silenced",
-            "until": self.silence_until,
-            "silence_snapshot": list(self.silence_snapshot_codes)
+            "until": self.silence_until
         }
 
     async def handle_manual_override(self):
@@ -147,86 +192,121 @@ class Orchestrator:
             # Evaluate critical alarm conditions
             new_alarms = []
             s = data.get("sensors", {})
+            current_state = data.get("state", 0) # 0=Standby, 1=Warmup, 2=Working
 
-            # 1. Sensor faults
-            status = s.get("status", 0)
-            t_feed_res = s.get("t_feed_res")
-            t_feed_pre = s.get("t_feed_pre")
-            t_liq_reac = s.get("t_liq_reac")
-            t_gas_int = s.get("t_gas_reac_int")
-            t_gas_ext = s.get("t_gas_reac_ext")
+            # Alarms are ONLY active during WORKING state (state == 2)
+            if current_state == 2:
+                # 1. Evaluate Thermocouple Faults (with 60s grace period)
+                tc_map = [
+                    ("t_feed_res", (1 << 0), "ERR_TC_FAULT_RES", "Feedstock Reservoir TC Fault", "Feedstock Reservoir TC"),
+                    ("t_feed_pre", (1 << 1), "ERR_TC_FAULT_PRE", "Preheater TC Fault", "Preheater TC"),
+                    ("t_liq_reac", (1 << 2), "ERR_TC_FAULT_LIQ", "Liquid Reactor TC Fault", "Liquid Reactor TC"),
+                    ("t_gas_reac_int", (1 << 3), "ERR_TC_FAULT_GAS_INT", "Gas Reactor Internal TC Fault", "Gas Reactor Internal TC"),
+                    ("t_gas_reac_ext", (1 << 4), "ERR_TC_FAULT_GAS_EXT", "Gas Reactor External TC Fault", "Gas Reactor External TC")
+                ]
+                status = s.get("status", 0)
 
-            # Check for NaN / Offline
-            if t_feed_res is None or (status & (1 << 0)):
-                new_alarms.append({"code": "ERR_TC_FAULT_RES", "name": "Feedstock Reservoir Sensor Fault", "desc": "Sensor went offline or registered a hardware read error."})
-            if t_feed_pre is None or (status & (1 << 1)):
-                new_alarms.append({"code": "ERR_TC_FAULT_PRE", "name": "Feedstock Preheater Sensor Fault", "desc": "Sensor went offline or registered a hardware read error."})
-            if t_liq_reac is None or (status & (1 << 2)):
-                new_alarms.append({"code": "ERR_TC_FAULT_LIQ", "name": "Liquid Reactor Sensor Fault", "desc": "Sensor went offline or registered a hardware read error."})
-            if t_gas_int is None or (status & (1 << 3)):
-                new_alarms.append({"code": "ERR_TC_FAULT_GAS_INT", "name": "Gas Reactor Internal Sensor Fault", "desc": "Sensor went offline or registered a hardware read error."})
-            if t_gas_ext is None or (status & (1 << 4)):
-                new_alarms.append({"code": "ERR_TC_FAULT_GAS_EXT", "name": "Gas Reactor External Sensor Fault", "desc": "Sensor went offline or registered a hardware read error."})
+                for key, err_bit, code, name, label in tc_map:
+                    val = s.get(key)
+                    is_fault = (val is None) or (isinstance(val, float) and math.isnan(val)) or bool(status & err_bit)
+                    if is_fault:
+                        if key not in self.tc_offline_start:
+                            self.tc_offline_start[key] = now
+                        offline_sec = int(now - self.tc_offline_start[key])
+                        if offline_sec >= 60:
+                            new_alarms.append({
+                                "code": code,
+                                "name": name,
+                                "desc": f"{label} offline for {offline_sec}s (exceeds 60s fault limit)"
+                            })
+                    else:
+                        self.tc_offline_start.pop(key, None)
 
-            # 2. Temperature limits (if values are available)
-            if t_feed_pre is not None and t_feed_pre > 280.0:
-                new_alarms.append({
-                    "code": "ERR_TEMP_HIGH_PREHEATER",
-                    "name": "Preheater Temperature High",
-                    "desc": f"Feedstock preheater temperature exceeded critical threshold (280°C): {t_feed_pre:.1f}°C"
-                })
-            if t_liq_reac is not None and t_liq_reac > 480.0:
-                new_alarms.append({
-                    "code": "ERR_TEMP_HIGH_LIQUID",
-                    "name": "Liquid Reactor Temperature High",
-                    "desc": f"Internal liquid phase reactor temperature exceeded critical threshold (480°C): {t_liq_reac:.1f}°C"
-                })
-            if t_gas_int is not None and t_gas_ext is not None:
-                gas_avg = t_gas_int * 0.7 + t_gas_ext * 0.3
-                if gas_avg > 750.0:
-                    new_alarms.append({
-                        "code": "ERR_TEMP_HIGH_GAS",
-                        "name": "Gas Reactor Temperature High",
-                        "desc": f"Weighted gas phase reactor temperature exceeded critical threshold (750°C): {gas_avg:.1f}°C"
-                    })
+                # 2. Temperature High/Low Threshold Checks
+                t_pre = s.get("t_feed_pre")
+                t_liq = s.get("t_liq_reac")
+                t_gas_int = s.get("t_gas_reac_int")
+                t_gas_ext = s.get("t_gas_reac_ext")
 
-            # Process alarm outputs & muting
+                # Preheater
+                if t_pre is not None and not math.isnan(t_pre):
+                    p_low = self.alarm_config["preheater"]["low"]
+                    p_high = self.alarm_config["preheater"]["high"]
+                    if t_pre < p_low:
+                        new_alarms.append({
+                            "code": "ERR_TEMP_LOW_PREHEATER",
+                            "name": "Preheater Temperature Low",
+                            "desc": f"Preheater temp is below minimum threshold of {p_low:.1f}°C (current: {t_pre:.1f}°C)"
+                        })
+                    elif t_pre > p_high:
+                        new_alarms.append({
+                            "code": "ERR_TEMP_HIGH_PREHEATER",
+                            "name": "Preheater Temperature High",
+                            "desc": f"Preheater temp is exceeding maximum threshold of {p_high:.1f}°C (current: {t_pre:.1f}°C)"
+                        })
+
+                # Liquid Reactor
+                if t_liq is not None and not math.isnan(t_liq):
+                    l_low = self.alarm_config["liquid"]["low"]
+                    l_high = self.alarm_config["liquid"]["high"]
+                    if t_liq < l_low:
+                        new_alarms.append({
+                            "code": "ERR_TEMP_LOW_LIQUID",
+                            "name": "Liquid Reactor Temperature Low",
+                            "desc": f"Liquid Reactor temp is below minimum threshold of {l_low:.1f}°C (current: {t_liq:.1f}°C)"
+                        })
+                    elif t_liq > l_high:
+                        new_alarms.append({
+                            "code": "ERR_TEMP_HIGH_LIQUID",
+                            "name": "Liquid Reactor Temperature High",
+                            "desc": f"Liquid Reactor temp is exceeding maximum threshold of {l_high:.1f}°C (current: {t_liq:.1f}°C)"
+                        })
+
+                # Gas Reactor (Weighted Average)
+                if t_gas_int is not None and t_gas_ext is not None and not math.isnan(t_gas_int) and not math.isnan(t_gas_ext):
+                    gas_avg = t_gas_int * 0.7 + t_gas_ext * 0.3
+                    g_low = self.alarm_config["gas"]["low"]
+                    g_high = self.alarm_config["gas"]["high"]
+                    if gas_avg < g_low:
+                        new_alarms.append({
+                            "code": "ERR_TEMP_LOW_GAS",
+                            "name": "Gas Reactor Temperature Low",
+                            "desc": f"Gas Reactor avg temp is below minimum threshold of {g_low:.1f}°C (current: {gas_avg:.1f}°C)"
+                        })
+                    elif gas_avg > g_high:
+                        new_alarms.append({
+                            "code": "ERR_TEMP_HIGH_GAS",
+                            "name": "Gas Reactor Temperature High",
+                            "desc": f"Gas Reactor avg temp is exceeding maximum threshold of {g_high:.1f}°C (current: {gas_avg:.1f}°C)"
+                        })
+            else:
+                # In Standby, Warmup, Shutdown: clear offline grace timers
+                self.tc_offline_start = {}
+
+            # Process alarm output & silence
+            self.active_alarms = new_alarms
             is_silenced = now < self.silence_until
 
-            if new_alarms:
-                self.active_alarms = new_alarms
-                if is_silenced:
-                    # Silence is active: keep relay open (buzzer off)
-                    if self.buzzer_relay:
-                        self.buzzer_relay.off()
-                    
-                    # Track any new alarm triggers that occurred during this silent period
-                    for alarm in new_alarms:
-                        if alarm["code"] not in self.silence_snapshot_codes:
-                            if alarm["code"] not in {m["code"] for m in self.muted_alarms_during_silence}:
-                                self.muted_alarms_during_silence.append(alarm)
-                else:
-                    # Silence is not active or expired: sound the buzzer (close relay)
-                    if self.buzzer_relay:
-                        self.buzzer_relay.on()
-                    # Once silence expires/is inactive, clear the muted list
-                    self.muted_alarms_during_silence = []
-            else:
-                # No active alarm conditions: turn buzzer off
+            if is_silenced:
+                # Silenced: relay open (buzzer off)
                 if self.buzzer_relay:
                     self.buzzer_relay.off()
-                self.active_alarms = []
-                self.muted_alarms_during_silence = []
-                if not is_silenced:
+            else:
+                # Not silenced
+                if self.active_alarms:
+                    if self.buzzer_relay:
+                        self.buzzer_relay.on()
+                else:
+                    if self.buzzer_relay:
+                        self.buzzer_relay.off()
                     self.silence_until = 0.0
 
             # Inject alarms into telemetry
-            silence_time_left = max(0.0, self.silence_until - now) if self.silence_until > 0.0 else 0.0
+            silence_time_left = max(0.0, self.silence_until - now) if self.silence_until > now else 0.0
             data["alarms"] = {
                 "active": self.active_alarms,
                 "silenced": is_silenced,
-                "silence_time_left": round(silence_time_left, 1),
-                "muted_events": self.muted_alarms_during_silence
+                "silence_time_left": round(silence_time_left, 1)
             }
 
             # Add to weight history for rolling average
