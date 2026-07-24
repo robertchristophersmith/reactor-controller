@@ -52,6 +52,7 @@
             const [timeRange, setTimeRange] = useState(0.5);
             const [runStatus, setRunStatus] = useState(null);
             const [sessionReady, setSessionReady] = useState(false);
+            const [showAlarmConfig, setShowAlarmConfig] = useState(false);
 
             useEffect(() => {
                 fetch('/api/run/status')
@@ -122,7 +123,6 @@
 
             if (!latest) return <div className="p-10 text-center text-gray-400 animate-pulse">Waiting for telemetry...</div>;
 
-            const [showAlarmConfig, setShowAlarmConfig] = useState(false);
             const s = latest.sensors || {};
             const h = latest.heaters || {};
             const sp = latest.sp || {};
@@ -280,6 +280,8 @@
                     )}
                 </div>
             );
+        }
+
         function AlarmConfigModal({ onClose }) {
             const [cfg, setCfg] = useState({
                 preheater: { low: 100, high: 180 },
