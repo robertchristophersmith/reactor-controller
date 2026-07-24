@@ -19,6 +19,10 @@ SensorManager::SensorManager() {
 }
 
 void SensorManager::begin() {
+  // ATmega2560 Hardware SS (Pin 53) MUST be OUTPUT HIGH for SPI Master Mode
+  pinMode(53, OUTPUT);
+  digitalWrite(53, HIGH);
+
   // Initialize Chip Selects
   pinMode(PIN_SPI_CS_TC_FEEDSTOCK_RESERVOIR, OUTPUT);
   pinMode(PIN_SPI_CS_TC_FEEDSTOCK_PREHEATER, OUTPUT);
@@ -32,6 +36,11 @@ void SensorManager::begin() {
   digitalWrite(PIN_SPI_CS_TC_GAS_REACTOR_INT, HIGH);
   digitalWrite(PIN_SPI_CS_TC_GAS_REACTOR_EXT, HIGH);
 
+  // Initialize Hardware SPI before TC instances begin
+  SPI.begin();
+  // Slow down SPI to ~500kHz (16MHz / 32) for stability
+  SPI.setClockDivider(SPI_CLOCK_DIV32);
+
   // Initialize TC instances
   if (!_tcFeedstockReservoir->begin())
     Serial.println("TC Feedstock Res init failed");
@@ -43,11 +52,6 @@ void SensorManager::begin() {
     Serial.println("TC Gas Reac Int init failed");
   if (!_tcGasReactorExt->begin())
     Serial.println("TC Gas Reac Ext init failed");
-
-  // Initialize Hardware SPI
-  SPI.begin();
-  // Slow down SPI to ~500kHz (16MHz / 32) for stability
-  SPI.setClockDivider(SPI_CLOCK_DIV32);
 
   // Initialize Analog H2 Sensor Pin
   pinMode(PIN_H2_SENSOR, INPUT);
@@ -78,22 +82,17 @@ void SensorManager::update() {
   // Helper to read TC and print error if any
   auto readTc = [&](Adafruit_MAX31855 *tc, const char *name) -> float {
     float t = tc->readCelsius();
-    if (isnan(t)) {
-      uint8_t err = tc->readError();
-      Serial.print("Error ");
-      Serial.print(name);
-      Serial.print(": 0x");
-      Serial.println(err, HEX);
-      return NAN;
-    }
-    if (t == 0.0) {
-      uint8_t err = tc->readError();
+    float internal = tc->readInternal();
+    uint8_t err = tc->readError();
+
+    if (isnan(t) || isnan(internal) || err != 0 || (t == 0.0 && internal == 0.0)) {
       if (err) {
-        Serial.print("Error (0.0) ");
+        Serial.print("Error ");
         Serial.print(name);
         Serial.print(": 0x");
         Serial.println(err, HEX);
       }
+      return NAN;
     }
     return t;
   };

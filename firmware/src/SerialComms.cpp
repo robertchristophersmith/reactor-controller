@@ -74,11 +74,20 @@ void SerialComms::sendTelemetry(const SensorData &sensors,
   JsonObject s = doc.createNestedObject("sensors");
   s["status"] = sensors.sensorStatus;
   s["weight"] = sensors.weightKg;
-  s["t_feed_res"] = sensors.tempFeedstockReservoir;
-  s["t_feed_pre"] = sensors.tempFeedstockPreheater;
-  s["t_liq_reac"] = sensors.tempLiquidReactor;
-  s["t_gas_reac_int"] = sensors.tempGasReactorInt;
-  s["t_gas_reac_ext"] = sensors.tempGasReactorExt;
+
+  auto setTc = [&](const char *key, float val) {
+    if (isnan(val)) {
+      s[key] = nullptr;
+    } else {
+      s[key] = val;
+    }
+  };
+
+  setTc("t_feed_res", sensors.tempFeedstockReservoir);
+  setTc("t_feed_pre", sensors.tempFeedstockPreheater);
+  setTc("t_liq_reac", sensors.tempLiquidReactor);
+  setTc("t_gas_reac_int", sensors.tempGasReactorInt);
+  setTc("t_gas_reac_ext", sensors.tempGasReactorExt);
   s["h2"] = sensors.h2ConcentrationPpm;
 
   // Heaters

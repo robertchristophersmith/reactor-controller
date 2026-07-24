@@ -500,6 +500,7 @@
 
         function SensorCard({ title, value, unit, color, border, connected }) {
             const isDisconnected = connected === false;
+            const isValid = value !== null && value !== undefined && !isNaN(value);
 
             return (
                 <div className={`bg-gray-800 p-4 rounded-lg border ${border} shadow opacity-90 relative overflow-hidden ${isDisconnected ? 'grayscale opacity-50' : ''}`}>
@@ -510,7 +511,7 @@
                     )}
                     <h3 className={`text-lg font-semibold mb-2 ${color}`}>{title}</h3>
                     <div>
-                        <div className="text-4xl font-mono">{(value || 0).toFixed(2)}</div>
+                        <div className={`text-4xl font-mono ${isValid ? '' : 'text-red-400 font-bold'}`}>{isValid ? value.toFixed(2) : 'ERR'}</div>
                         <div className="text-sm text-gray-500">{unit}</div>
                     </div>
                 </div>
@@ -522,9 +523,10 @@
             const [rate, setRate] = useState(0);
 
             const isDisconnected = connected === false;
+            const isValid = temp !== null && temp !== undefined && !isNaN(temp);
 
             return (
-                <div className={`bg-gray-800 p-4 rounded-lg border border-gray-700 relative overflow-hidden ${isDisconnected ? 'grayscale opacity-50' : ''}`}>
+                <div className={`bg-gray-800 p-4 rounded-lg border ${isValid ? 'border-gray-700' : 'border-red-600'} relative overflow-hidden ${isDisconnected ? 'grayscale opacity-50' : ''}`}>
                     {isDisconnected && (
                         <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 z-10 backdrop-blur-sm">
                             <span className="text-red-500 font-bold border border-red-500 px-2 py-1 rounded bg-red-900/20 animate-pulse">DISCONNECTED</span>
@@ -534,7 +536,7 @@
                     <h3 className="text-lg font-semibold text-gray-300 mb-2">{title}</h3>
                     <div className="flex justify-between items-end mb-4">
                         <div>
-                            <div className="text-4xl font-mono">{(temp || 0).toFixed(1)}&deg;C</div>
+                            <div className={`text-4xl font-mono ${isValid ? '' : 'text-red-400 font-bold'}`}>{isValid ? temp.toFixed(1) + '°C' : 'ERR'}</div>
                             {sub && <div className="text-xs text-gray-400 font-mono mt-1">{sub}</div>}
                             <div className="text-sm text-gray-500 mt-1">Output: <span className={out > 0 ? "text-orange-400" : "text-gray-600"}>{(out / 10).toFixed(0)}%</span></div>
                         </div>
