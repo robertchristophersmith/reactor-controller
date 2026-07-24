@@ -44,6 +44,10 @@ async def set_setpoint(zone: int, value: float, rate: float = 0.0):
     await orchestrator.send_setpoint(zone, value, rate)
     return {"status": "command_sent", "zone": zone, "value": value, "rate": rate}
 
+@app.post("/api/control/alarm/silence")
+async def silence_alarm():
+    return orchestrator.silence_alarms()
+
 @app.post("/api/control/tare")
 async def tare_loadcell():
     await orchestrator.send_tare()

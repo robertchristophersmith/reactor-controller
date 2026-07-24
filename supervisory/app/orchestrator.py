@@ -6,6 +6,7 @@ from .crud import create_log
 import logging
 from .motor_controller import motor_controller
 import time
+from .config import settings
 
 logger = logging.getLogger("orchestrator")
 
@@ -18,6 +19,34 @@ class Orchestrator:
         self.latest_state = {}
         self.ramps = {} # {zone: {target: float, rate_per_sec: float, last_update: float}}
         self.subscribers = set() # WebSocket queues
+
+        # Alarm State & Buzzer Relay Setup
+        self.active_alarms = []
+        self.silence_until = 0.0
+        self.muted_alarms_during_silence = []
+        self.silence_snapshot_codes = set()
+        
+        self.buzzer_relay = None
+        try:
+            from gpiozero import OutputDevice
+            # IN1 driven LOW closes relay (buzzer ON), driven HIGH opens relay (buzzer OFF)
+            self.buzzer_relay = OutputDevice(settings.BUZZER_RELAY_PIN, active_high=False, initial_value=False)
+            logger.info(f"Initialized Buzzer Relay on GPIO {settings.BUZZER_RELAY_PIN} (Active Low)")
+        except Exception as e:
+            logger.warning(f"Could not initialize native GPIO buzzer relay: {e}. Falling back to mock relay.")
+            class MockRelay:
+                def __init__(self):
+                    self.value = False
+                def on(self):
+                    self.value = True
+                    logger.debug("MOCK RELAY: CLOSED (Buzzer ON)")
+                def off(self):
+                    self.value = False
+                    logger.debug("MOCK RELAY: OPEN (Buzzer OFF)")
+                @property
+                def is_active(self):
+                    return self.value
+            self.buzzer_relay = MockRelay()
         
         # Pump State
         self.pump_mode = "manual"
@@ -35,6 +64,19 @@ class Orchestrator:
         motor_controller.override_callback = self.handle_manual_override
         self.auto_task = None
         self.poll_task = None
+
+    def silence_alarms(self):
+        self.silence_until = time.time() + 300.0  # 5 minutes
+        self.silence_snapshot_codes = {a["code"] for a in self.active_alarms}
+        self.muted_alarms_during_silence = []
+        if self.buzzer_relay:
+            self.buzzer_relay.off()
+        logger.info("Alarms silenced for 5 minutes.")
+        return {
+            "status": "silenced",
+            "until": self.silence_until,
+            "silence_snapshot": list(self.silence_snapshot_codes)
+        }
 
     async def handle_manual_override(self):
         logger.warning("Manual override received from Motor Controller!")
@@ -101,6 +143,91 @@ class Orchestrator:
                 
                 ramp["last_update"] = now
                 await self.send_command_setpoint(zone, new_sp)
+
+            # Evaluate critical alarm conditions
+            new_alarms = []
+            s = data.get("sensors", {})
+
+            # 1. Sensor faults
+            status = s.get("status", 0)
+            t_feed_res = s.get("t_feed_res")
+            t_feed_pre = s.get("t_feed_pre")
+            t_liq_reac = s.get("t_liq_reac")
+            t_gas_int = s.get("t_gas_reac_int")
+            t_gas_ext = s.get("t_gas_reac_ext")
+
+            # Check for NaN / Offline
+            if t_feed_res is None or (status & (1 << 0)):
+                new_alarms.append({"code": "ERR_TC_FAULT_RES", "name": "Feedstock Reservoir Sensor Fault", "desc": "Sensor went offline or registered a hardware read error."})
+            if t_feed_pre is None or (status & (1 << 1)):
+                new_alarms.append({"code": "ERR_TC_FAULT_PRE", "name": "Feedstock Preheater Sensor Fault", "desc": "Sensor went offline or registered a hardware read error."})
+            if t_liq_reac is None or (status & (1 << 2)):
+                new_alarms.append({"code": "ERR_TC_FAULT_LIQ", "name": "Liquid Reactor Sensor Fault", "desc": "Sensor went offline or registered a hardware read error."})
+            if t_gas_int is None or (status & (1 << 3)):
+                new_alarms.append({"code": "ERR_TC_FAULT_GAS_INT", "name": "Gas Reactor Internal Sensor Fault", "desc": "Sensor went offline or registered a hardware read error."})
+            if t_gas_ext is None or (status & (1 << 4)):
+                new_alarms.append({"code": "ERR_TC_FAULT_GAS_EXT", "name": "Gas Reactor External Sensor Fault", "desc": "Sensor went offline or registered a hardware read error."})
+
+            # 2. Temperature limits (if values are available)
+            if t_feed_pre is not None and t_feed_pre > 280.0:
+                new_alarms.append({
+                    "code": "ERR_TEMP_HIGH_PREHEATER",
+                    "name": "Preheater Temperature High",
+                    "desc": f"Feedstock preheater temperature exceeded critical threshold (280°C): {t_feed_pre:.1f}°C"
+                })
+            if t_liq_reac is not None and t_liq_reac > 480.0:
+                new_alarms.append({
+                    "code": "ERR_TEMP_HIGH_LIQUID",
+                    "name": "Liquid Reactor Temperature High",
+                    "desc": f"Internal liquid phase reactor temperature exceeded critical threshold (480°C): {t_liq_reac:.1f}°C"
+                })
+            if t_gas_int is not None and t_gas_ext is not None:
+                gas_avg = t_gas_int * 0.7 + t_gas_ext * 0.3
+                if gas_avg > 750.0:
+                    new_alarms.append({
+                        "code": "ERR_TEMP_HIGH_GAS",
+                        "name": "Gas Reactor Temperature High",
+                        "desc": f"Weighted gas phase reactor temperature exceeded critical threshold (750°C): {gas_avg:.1f}°C"
+                    })
+
+            # Process alarm outputs & muting
+            is_silenced = now < self.silence_until
+
+            if new_alarms:
+                self.active_alarms = new_alarms
+                if is_silenced:
+                    # Silence is active: keep relay open (buzzer off)
+                    if self.buzzer_relay:
+                        self.buzzer_relay.off()
+                    
+                    # Track any new alarm triggers that occurred during this silent period
+                    for alarm in new_alarms:
+                        if alarm["code"] not in self.silence_snapshot_codes:
+                            if alarm["code"] not in {m["code"] for m in self.muted_alarms_during_silence}:
+                                self.muted_alarms_during_silence.append(alarm)
+                else:
+                    # Silence is not active or expired: sound the buzzer (close relay)
+                    if self.buzzer_relay:
+                        self.buzzer_relay.on()
+                    # Once silence expires/is inactive, clear the muted list
+                    self.muted_alarms_during_silence = []
+            else:
+                # No active alarm conditions: turn buzzer off
+                if self.buzzer_relay:
+                    self.buzzer_relay.off()
+                self.active_alarms = []
+                self.muted_alarms_during_silence = []
+                if not is_silenced:
+                    self.silence_until = 0.0
+
+            # Inject alarms into telemetry
+            silence_time_left = max(0.0, self.silence_until - now) if self.silence_until > 0.0 else 0.0
+            data["alarms"] = {
+                "active": self.active_alarms,
+                "silenced": is_silenced,
+                "silence_time_left": round(silence_time_left, 1),
+                "muted_events": self.muted_alarms_during_silence
+            }
 
             # Add to weight history for rolling average
             current_weight = data.get("sensors", {}).get("weight", 0.0)
