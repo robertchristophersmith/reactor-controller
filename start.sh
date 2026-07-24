@@ -24,9 +24,9 @@ fi
 # Launch Chromium browser in full-screen kiosk mode and detach it
 echo "Launching browser..."
 if command -v chromium-browser &> /dev/null; then
-    nohup chromium-browser --kiosk http://localhost:8000/ > /dev/null 2>&1 &
+    nohup chromium-browser --password-store=basic --kiosk http://localhost:8000/ > /dev/null 2>&1 &
 elif command -v chromium &> /dev/null; then
-    nohup chromium --kiosk http://localhost:8000/ > /dev/null 2>&1 &
+    nohup chromium --password-store=basic --kiosk http://localhost:8000/ > /dev/null 2>&1 &
 else
     echo "Error: Chromium browser not found! Please install it with: sudo apt install chromium-browser"
 fi
