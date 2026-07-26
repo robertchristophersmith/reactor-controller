@@ -103,8 +103,14 @@ void loop() {
     // updateFSM(data); // DISABLED: Removing FSM dependency
 
     // Calc Weighted PVs (70% Internal / 30% External) for Gas Reactor
-    float instantGas =
-        (data.tempGasReactorInt * 0.7) + (data.tempGasReactorExt * 0.3);
+    float instantGas = NAN;
+    if (!isnan(data.tempGasReactorInt) && !isnan(data.tempGasReactorExt)) {
+      instantGas = (data.tempGasReactorInt * 0.7) + (data.tempGasReactorExt * 0.3);
+    } else if (!isnan(data.tempGasReactorExt)) {
+      instantGas = data.tempGasReactorExt;
+    } else if (!isnan(data.tempGasReactorInt)) {
+      instantGas = data.tempGasReactorInt;
+    }
 
     wAvgGas.add(instantGas);
 

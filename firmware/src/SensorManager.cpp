@@ -79,7 +79,7 @@ void SensorManager::begin() {
 void SensorManager::update() {
   _currentData.sensorStatus = 0;
 
-  // Helper to read TC and print error if any
+  // Helper to read TC and print detailed error diagnostic
   auto readTc = [&](Adafruit_MAX31855 *tc, const char *name) -> float {
     float t = tc->readCelsius();
     float internal = tc->readInternal();
@@ -87,10 +87,14 @@ void SensorManager::update() {
 
     if (isnan(t) || isnan(internal) || err != 0 || (t == 0.0 && internal == 0.0)) {
       if (err) {
-        Serial.print("Error ");
+        Serial.print("TC Error [");
         Serial.print(name);
-        Serial.print(": 0x");
-        Serial.println(err, HEX);
+        Serial.print("]: 0x");
+        Serial.print(err, HEX);
+        if (err & 0x01) Serial.print(" (OPEN CIRCUIT)");
+        if (err & 0x02) Serial.print(" (SHORT TO GND)");
+        if (err & 0x04) Serial.print(" (SHORT TO VCC)");
+        Serial.println();
       }
       return NAN;
     }
@@ -117,10 +121,11 @@ void SensorManager::update() {
   if (isnan(_currentData.tempGasReactorExt))
     _currentData.sensorStatus |= ERR_TC_GAS_REACTOR_EXT;
 
-  if (isnan(_currentData.tempFeedstockReservoir) ||
-      isnan(_currentData.tempFeedstockPreheater) ||
-      isnan(_currentData.tempLiquidReactor) ||
-      isnan(_currentData.tempGasReactorInt) ||
+  // Healthy if at least one connected sensor is returning valid readings
+  if (isnan(_currentData.tempFeedstockReservoir) &&
+      isnan(_currentData.tempFeedstockPreheater) &&
+      isnan(_currentData.tempLiquidReactor) &&
+      isnan(_currentData.tempGasReactorInt) &&
       isnan(_currentData.tempGasReactorExt)) {
     _currentData.sensorsHealthy = false;
   } else {

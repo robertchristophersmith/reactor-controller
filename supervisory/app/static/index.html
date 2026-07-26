@@ -192,8 +192,10 @@
 
                         {/* Gas Reactor */}
                         <ZoneCard title="Gas Reactor"
-                            temp={s.t_gas_reac_int * 0.7 + s.t_gas_reac_ext * 0.3}
-                            sub={`Int: ${s.t_gas_reac_int}°C | Ext: ${s.t_gas_reac_ext}°C`}
+                            temp={(s.t_gas_reac_int != null && !isNaN(s.t_gas_reac_int) && s.t_gas_reac_ext != null && !isNaN(s.t_gas_reac_ext))
+                                ? (s.t_gas_reac_int * 0.7 + s.t_gas_reac_ext * 0.3)
+                                : (s.t_gas_reac_ext != null && !isNaN(s.t_gas_reac_ext) ? s.t_gas_reac_ext : s.t_gas_reac_int)}
+                            sub={`Int: ${s.t_gas_reac_int != null && !isNaN(s.t_gas_reac_int) ? Number(s.t_gas_reac_int).toFixed(1) + '°C' : 'ERR'} | Ext: ${s.t_gas_reac_ext != null && !isNaN(s.t_gas_reac_ext) ? Number(s.t_gas_reac_ext).toFixed(1) + '°C' : 'ERR'}`}
                             sp={sp.gas_reac} out={h.gas_reac}
                             onSetSp={(v, r) => sendSetpoint(2, v, r)} />
                     </div>
