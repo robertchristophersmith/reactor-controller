@@ -11,11 +11,11 @@ struct LoadCellCalibration {
 };
 
 SensorManager::SensorManager() {
-  _tcFeedstockReservoir = new Adafruit_MAX31855(PIN_SPI_CS_TC_FEEDSTOCK_RESERVOIR);
-  _tcFeedstockPreheater = new Adafruit_MAX31855(PIN_SPI_CS_TC_FEEDSTOCK_PREHEATER);
-  _tcLiquidReactor = new Adafruit_MAX31855(PIN_SPI_CS_TC_LIQUID_REACTOR);
-  _tcGasReactorInt = new Adafruit_MAX31855(PIN_SPI_CS_TC_GAS_REACTOR_INT);
-  _tcGasReactorExt = new Adafruit_MAX31855(PIN_SPI_CS_TC_GAS_REACTOR_EXT);
+  _tcFeedstockReservoir = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_FEEDSTOCK_RESERVOIR, PIN_SPI_MISO);
+  _tcFeedstockPreheater = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_FEEDSTOCK_PREHEATER, PIN_SPI_MISO);
+  _tcLiquidReactor = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_LIQUID_REACTOR, PIN_SPI_MISO);
+  _tcGasReactorInt = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_GAS_REACTOR_INT, PIN_SPI_MISO);
+  _tcGasReactorExt = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_GAS_REACTOR_EXT, PIN_SPI_MISO);
 }
 
 void SensorManager::begin() {

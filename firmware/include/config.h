@@ -7,16 +7,16 @@
 #define SERIAL_BAUD 115200
 
 // --- SPI Bus (MAX31855 Thermocouples) ---
-// Hardware SPI: SCK=52, MISO=50
+// Software SPI on Pins 7 (CLK) and 5 (MISO) to bypass damaged Mega Pin 50/52
 #ifdef PIN_SPI_SCK
 #undef PIN_SPI_SCK
 #endif
-#define PIN_SPI_SCK 52
+#define PIN_SPI_SCK 7
 
 #ifdef PIN_SPI_MISO
 #undef PIN_SPI_MISO
 #endif
-#define PIN_SPI_MISO 50
+#define PIN_SPI_MISO 5
 #define PIN_SPI_CS_TC_FEEDSTOCK_RESERVOIR 28 // Feedstock reservoir
 #define PIN_SPI_CS_TC_FEEDSTOCK_PREHEATER 22  // External feedstock preheater
 #define PIN_SPI_CS_TC_LIQUID_REACTOR 25       // Internal liquid phase reactor

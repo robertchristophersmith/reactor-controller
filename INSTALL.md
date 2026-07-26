@@ -9,7 +9,7 @@ This guide provides instructions for setting up both the **embedded firmware** (
    - **Pump Arduino** (Arduino Uno)
 2. Wire all sensors, breakout boards, and heater solid-state relays (SSRs) to the **Arduino Mega** as follows:
    - **SPI Thermocouple Breakout Boards (MAX31855)**:
-     - **Common Pins**: Connect the **CLK** (Clock) pin of all 5 breakout boards to Mega **Pin 52** (Hardware SPI SCK), and the **DO** (Data Out) pin of all 5 boards to Mega **Pin 50** (Hardware SPI MISO). Power all boards with **3.3V** and common **GND**.
+      - **Common Pins**: Connect the **CLK** (Clock) pin of all 5 breakout boards to Mega **Pin 7**, and the **DO** (Data Out) pin of all 5 boards to Mega **Pin 5**. Power all boards with **3.3V/5V** and common **GND**.
      - **Chip Select (CS) Pins**:
        - **Feedstock Reservoir**: Connect CS to Mega **Pin 28**.
        - **External Feedstock Preheater**: Connect CS to Mega **Pin 22**.
