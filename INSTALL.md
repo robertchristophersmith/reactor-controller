@@ -11,11 +11,11 @@ This guide provides instructions for setting up both the **embedded firmware** (
    - **SPI Thermocouple Breakout Boards (MAX31855)**:
       - **Common Pins**: Connect the **CLK** (Clock) pin of all 5 breakout boards to Mega **Pin 7**, and the **DO** (Data Out) pin of all 5 boards to Mega **Pin 5**. Power all boards with **3.3V/5V** and common **GND**.
      - **Chip Select (CS) Pins**:
-       - **Feedstock Reservoir**: Connect CS to Mega **Pin 28**.
-       - **External Feedstock Preheater**: Connect CS to Mega **Pin 22**.
-       - **Internal Liquid Phase Reactor**: Connect CS to Mega **Pin 25**.
-       - **Internal Gas Phase Reactor**: Connect CS to Mega **Pin 27**.
-       - **External Gas Phase Reactor**: Connect CS to Mega **Pin 26**.
+        - **Feedstock Reservoir**: Connect CS to Mega **Pin 38**.
+        - **External Feedstock Preheater**: Connect CS to Mega **Pin 40**.
+        - **Internal Liquid Phase Reactor**: Connect CS to Mega **Pin 42**.
+        - **Internal Gas Phase Reactor**: Connect CS to Mega **Pin 44**.
+        - **External Gas Phase Reactor**: Connect CS to Mega **Pin 46**.
     - **Analog Hydrogen Sensor (MQ-8)**:
       - Connect the sensor's **AO** (Analog Output) pin to Mega **Analog Input Pin A0**.
       - Power the sensor board with **5V** and common **GND**.

@@ -12,11 +12,11 @@ struct TcChannel {
 };
 
 TcChannel channels[] = {
-    {"Feedstock Reservoir", 28},
-    {"Feedstock Preheater", 22},
-    {"Liquid Reactor    ", 25},
-    {"Gas Reactor (Int) ", 27},
-    {"Gas Reactor (Ext) ", 26}
+    {"Feedstock Reservoir", 38},
+    {"Feedstock Preheater", 40},
+    {"Liquid Reactor    ", 42},
+    {"Gas Reactor (Int) ", 44},
+    {"Gas Reactor (Ext) ", 46}
 };
 
 const int NUM_CHANNELS = sizeof(channels) / sizeof(channels[0]);
