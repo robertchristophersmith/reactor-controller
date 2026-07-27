@@ -1,24 +1,38 @@
 #include <Arduino.h>
-#include <SPI.h>
 #include <Adafruit_MAX31855.h>
 
-// Standard Mega Hardware SPI Pins
-#define PIN_SCK 52
-#define PIN_MISO 50
-#define PIN_CS_GAS_EXT 26
+// Common Software SPI Pins (Bypassing damaged Mega Pin 50/52)
+#define PIN_SCK 7
+#define PIN_MISO 5
 
-// Alternative Pins for testing if Mega Pin 50/52 was damaged
-#define ALT_PIN_SCK 7
-#define ALT_PIN_MISO 5
+// Chip Select (CS) Pins for all 5 Thermocouple Breakout Boards
+struct TcChannel {
+  const char *name;
+  uint8_t csPin;
+};
 
-Adafruit_MAX31855 hwTC(PIN_CS_GAS_EXT, &SPI);
-Adafruit_MAX31855 swTC_Std(PIN_SCK, PIN_CS_GAS_EXT, PIN_MISO);
-Adafruit_MAX31855 swTC_Alt(ALT_PIN_SCK, PIN_CS_GAS_EXT, ALT_PIN_MISO);
+TcChannel channels[] = {
+    {"Feedstock Reservoir", 28},
+    {"Feedstock Preheater", 22},
+    {"Liquid Reactor    ", 25},
+    {"Gas Reactor (Int) ", 27},
+    {"Gas Reactor (Ext) ", 26}
+};
+
+const int NUM_CHANNELS = sizeof(channels) / sizeof(channels[0]);
 
 uint32_t rawBitBangRead(uint8_t sclk, uint8_t cs, uint8_t miso) {
   uint32_t d = 0;
+
+  // Deselect all CS pins first to prevent SPI bus contention
+  for (int i = 0; i < NUM_CHANNELS; i++) {
+    digitalWrite(channels[i].csPin, HIGH);
+  }
+
+  // Select target CS
   digitalWrite(cs, LOW);
   delayMicroseconds(10);
+
   for (int i = 31; i >= 0; i--) {
     digitalWrite(sclk, LOW);
     delayMicroseconds(10);
@@ -29,82 +43,107 @@ uint32_t rawBitBangRead(uint8_t sclk, uint8_t cs, uint8_t miso) {
     digitalWrite(sclk, HIGH);
     delayMicroseconds(10);
   }
+
   digitalWrite(cs, HIGH);
   return d;
+}
+
+void analyzePayload(const char *name, uint8_t csPin, uint32_t payload) {
+  Serial.print("[Pin ");
+  if (csPin < 10) Serial.print(" ");
+  Serial.print(csPin);
+  Serial.print("] ");
+  Serial.print(name);
+  Serial.print(" | Hex: 0x");
+
+  // Print 8 hex digits with leading zeros
+  for (int i = 7; i >= 0; i--) {
+    uint8_t nibble = (payload >> (i * 4)) & 0x0F;
+    Serial.print(nibble, HEX);
+  }
+
+  Serial.print(" -> ");
+
+  if (payload == 0xFFFFFFFF) {
+    Serial.println("STATUS: [FAIL] 0xFFFFFFFF (NO SPI RESPONSE - Check 5V/GND power, CS wire, or DO wire)");
+    return;
+  }
+
+  if (payload == 0x00000000) {
+    Serial.println("STATUS: [FAIL] 0x00000000 (ALL LOW - MISO line shorted to GND or another board holding bus LOW)");
+    return;
+  }
+
+  // Extract error bits (Bits 0, 1, 2)
+  uint8_t err = payload & 0x07;
+  bool faultBit = (payload >> 16) & 0x01;
+
+  // Extract internal temp (Bits 15..4)
+  int16_t rawInt = (payload >> 4) & 0x07FF;
+  if ((payload >> 4) & 0x0800) {
+    rawInt |= 0xF800; // Sign extend negative
+  }
+  float internalC = rawInt * 0.0625;
+
+  // Extract TC temp (Bits 31..18)
+  int32_t rawTc = payload;
+  if (rawTc & 0x80000000) {
+    rawTc = 0xFFFFC000 | ((rawTc >> 18) & 0x3FFF);
+  } else {
+    rawTc >>= 18;
+  }
+  float tcC = rawTc * 0.25;
+
+  if (err == 0 && !faultBit) {
+    Serial.print("STATUS: [OK] Temp: ");
+    Serial.print(tcC, 2);
+    Serial.print(" °C (Internal: ");
+    Serial.print(internalC, 2);
+    Serial.println(" °C)");
+  } else {
+    Serial.print("STATUS: [FAULT] ");
+    if (err & 0x01) Serial.print("OPEN CIRCUIT (Wires missing or loose in terminal block) ");
+    if (err & 0x02) Serial.print("SHORT TO GND (Probe metal tip touching grounded reactor body) ");
+    if (err & 0x04) Serial.print("SHORT TO VCC (Probe wire touching power line) ");
+    Serial.println();
+  }
 }
 
 void setup() {
   Serial.begin(115200);
   while (!Serial && millis() < 3000);
 
-  Serial.println("\n==================================================");
-  Serial.println("  MAX31855 Advanced Pin & SPI Payload Scanner    ");
-  Serial.println("==================================================");
+  Serial.println("\n=======================================================");
+  Serial.println("   MAX31855 Full 5-Channel Diagnostic Scanner Tool    ");
+  Serial.println("   Software SPI: CLK = Pin 7  |  DO (MISO) = Pin 5    ");
+  Serial.println("=======================================================");
 
-  // Hardware SS Pin 53 must be OUTPUT HIGH on ATmega2560
-  pinMode(53, OUTPUT);
-  digitalWrite(53, HIGH);
-
-  pinMode(PIN_CS_GAS_EXT, OUTPUT);
-  digitalWrite(PIN_CS_GAS_EXT, HIGH);
-
+  // Set SCK and MISO pin modes
   pinMode(PIN_SCK, OUTPUT);
   pinMode(PIN_MISO, INPUT);
-  pinMode(ALT_PIN_SCK, OUTPUT);
-  pinMode(ALT_PIN_MISO, INPUT);
 
-  SPI.begin();
-  SPI.setClockDivider(SPI_CLOCK_DIV32);
+  // Set all CS pins to OUTPUT HIGH
+  for (int i = 0; i < NUM_CHANNELS; i++) {
+    pinMode(channels[i].csPin, OUTPUT);
+    digitalWrite(channels[i].csPin, HIGH);
+  }
 
-  hwTC.begin();
-  swTC_Std.begin();
-  swTC_Alt.begin();
+  // ATmega2560 SS Pin 53 must be OUTPUT HIGH
+  pinMode(53, OUTPUT);
+  digitalWrite(53, HIGH);
 }
 
 void loop() {
-  Serial.println("\n--- Live Diagnostic Read (CS Pin 26) ---");
+  Serial.println("\n-------------------------------------------------------");
+  Serial.println("  Scanning All 5 MAX31855 Breakout Channels...");
+  Serial.println("-------------------------------------------------------");
 
-  // 1. Raw Bit-Bang Read on Standard Pins 52 (CLK) and 50 (MISO)
-  uint32_t rawStd = rawBitBangRead(PIN_SCK, PIN_CS_GAS_EXT, PIN_MISO);
-  Serial.print("Raw 32-bit payload on Pins 52 (CLK) & 50 (MISO): 0x");
-  Serial.println(rawStd, HEX);
-
-  // 2. Raw Bit-Bang Read on ALT Pins 7 (CLK) and 5 (MISO)
-  uint32_t rawAlt = rawBitBangRead(ALT_PIN_SCK, PIN_CS_GAS_EXT, ALT_PIN_MISO);
-  Serial.print("Raw 32-bit payload on ALT Pins 7 (CLK) & 5 (MISO): 0x");
-  Serial.println(rawAlt, HEX);
-
-  // 3. Adafruit library reads
-  float hwTemp = hwTC.readCelsius();
-  uint8_t hwErr = hwTC.readError();
-  Serial.print("[Hardware SPI] Temp: ");
-  if (isnan(hwTemp)) Serial.print("NAN"); else Serial.print(hwTemp, 2);
-  Serial.print(" °C | Error Code: 0x"); Serial.println(hwErr, HEX);
-
-  float swAltTemp = swTC_Alt.readCelsius();
-  uint8_t swAltErr = swTC_Alt.readError();
-  Serial.print("[ALT Software SPI (Pins 7&5)] Temp: ");
-  if (isnan(swAltTemp)) Serial.print("NAN"); else Serial.print(swAltTemp, 2);
-  Serial.print(" °C | Error Code: 0x"); Serial.println(swAltErr, HEX);
-
-  // 4. Root Cause Analysis
-  if (rawStd == 0xFFFFFFFF && rawAlt == 0xFFFFFFFF) {
-    Serial.println("\n>> RESULT: 0xFFFFFFFF (All HIGH) on BOTH standard and ALT pins!");
-    Serial.println("   [A] CS Pin 26 is NOT reaching the MAX31855 board CS terminal (check wire or pin).");
-    Serial.println("   [B] MAX31855 Board VIN (5V/3.3V) or GND power is disconnected/off.");
-    Serial.println("   [C] MISO wire (DO) is not connected or the MAX31855 chip itself is unpowered.");
-  } else if (rawStd == 0x00000000 && rawAlt == 0x00000000) {
-    Serial.println("\n>> RESULT: 0x00000000 (All LOW)!");
-    Serial.println("   [A] MISO line (DO) is shorted directly to GND.");
-  } else if (rawStd == 0xFFFFFFFF && rawAlt != 0xFFFFFFFF && !isnan(swAltTemp)) {
-    Serial.println("\n>> RESULT: ALT Pins 7 & 5 WORK PERFECTLY!");
-    Serial.println("   Mega Pin 50 (MISO) or Pin 52 (CLK) was damaged by the previous shorted module.");
-    Serial.println("   -> We can switch the firmware to use Software SPI on Pins 7 & 5!");
-  } else {
-    Serial.print("\n>> RESULT: Raw Payload = 0x"); Serial.println(rawStd, HEX);
-    if (rawStd & 0x01) Serial.println("   [!] OPEN CIRCUIT: Thermocouple yellow/red wires missing or loose in screw terminal.");
-    if (rawStd & 0x02) Serial.println("   [!] SHORT TO GND: Thermocouple metal tip touching grounded pipe/frame.");
+  for (int i = 0; i < NUM_CHANNELS; i++) {
+    uint32_t payload = rawBitBangRead(PIN_SCK, channels[i].csPin, PIN_MISO);
+    analyzePayload(channels[i].name, channels[i].csPin, payload);
+    delay(50);
   }
 
+  Serial.println("-------------------------------------------------------");
   delay(3000);
 }
