@@ -88,6 +88,7 @@ void SerialComms::sendTelemetry(const SensorData &sensors,
   setTc("t_liq_reac", sensors.tempLiquidReactor);
   setTc("t_gas_reac_int", sensors.tempGasReactorInt);
   setTc("t_gas_reac_ext", sensors.tempGasReactorExt);
+  setTc("t_elec_housing", sensors.tempElectronicsHousing);
   s["h2"] = sensors.h2ConcentrationPpm;
 
   // Heaters

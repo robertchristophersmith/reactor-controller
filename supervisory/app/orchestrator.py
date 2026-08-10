@@ -76,7 +76,8 @@ class Orchestrator:
         defaults = {
             "preheater": {"low": 100.0, "high": 180.0},
             "liquid": {"low": 170.0, "high": 220.0},
-            "gas": {"low": 180.0, "high": 270.0}
+            "gas": {"low": 180.0, "high": 270.0},
+            "housing": {"high": 90.0}
         }
         if os.path.exists(self.config_path):
             try:
@@ -84,8 +85,10 @@ class Orchestrator:
                     data = json.load(f)
                     for zone in defaults:
                         if zone in data:
-                            defaults[zone]["low"] = float(data[zone].get("low", defaults[zone]["low"]))
-                            defaults[zone]["high"] = float(data[zone].get("high", defaults[zone]["high"]))
+                            if "low" in defaults[zone] and "low" in data[zone]:
+                                defaults[zone]["low"] = float(data[zone].get("low", defaults[zone]["low"]))
+                            if "high" in defaults[zone] and "high" in data[zone]:
+                                defaults[zone]["high"] = float(data[zone].get("high", defaults[zone]["high"]))
             except Exception as e:
                 logger.error(f"Error loading alarm_config.json: {e}")
         else:
@@ -103,11 +106,13 @@ class Orchestrator:
         return self.alarm_config
 
     def update_alarm_config(self, new_cfg):
-        for zone in ["preheater", "liquid", "gas"]:
+        for zone in ["preheater", "liquid", "gas", "housing"]:
             if zone in new_cfg:
-                if "low" in new_cfg[zone]:
+                if "low" in new_cfg[zone] and "low" in self.alarm_config.get(zone, {}):
                     self.alarm_config[zone]["low"] = float(new_cfg[zone]["low"])
                 if "high" in new_cfg[zone]:
+                    if zone not in self.alarm_config:
+                        self.alarm_config[zone] = {}
                     self.alarm_config[zone]["high"] = float(new_cfg[zone]["high"])
         self.save_alarm_config(self.alarm_config)
         logger.info(f"Updated alarm config: {self.alarm_config}")
@@ -202,7 +207,8 @@ class Orchestrator:
                     ("t_feed_pre", (1 << 1), "ERR_TC_FAULT_PRE", "Preheater TC Fault", "Preheater TC"),
                     ("t_liq_reac", (1 << 2), "ERR_TC_FAULT_LIQ", "Liquid Reactor TC Fault", "Liquid Reactor TC"),
                     ("t_gas_reac_int", (1 << 3), "ERR_TC_FAULT_GAS_INT", "Gas Reactor Internal TC Fault", "Gas Reactor Internal TC"),
-                    ("t_gas_reac_ext", (1 << 4), "ERR_TC_FAULT_GAS_EXT", "Gas Reactor External TC Fault", "Gas Reactor External TC")
+                    ("t_gas_reac_ext", (1 << 4), "ERR_TC_FAULT_GAS_EXT", "Gas Reactor External TC Fault", "Gas Reactor External TC"),
+                    ("t_elec_housing", (1 << 5), "ERR_TC_FAULT_HOUSING", "Electronics Housing TC Fault", "Electronics Housing TC")
                 ]
                 status = s.get("status", 0)
 
@@ -227,6 +233,7 @@ class Orchestrator:
                 t_liq = s.get("t_liq_reac")
                 t_gas_int = s.get("t_gas_reac_int")
                 t_gas_ext = s.get("t_gas_reac_ext")
+                t_housing = s.get("t_elec_housing")
 
                 # Preheater
                 if t_pre is not None and not math.isnan(t_pre):
@@ -278,6 +285,16 @@ class Orchestrator:
                             "code": "ERR_TEMP_HIGH_GAS",
                             "name": "Gas Reactor Temperature High",
                             "desc": f"Gas Reactor avg temp is exceeding maximum threshold of {g_high:.1f}°C (current: {gas_avg:.1f}°C)"
+                        })
+
+                # Electronics Housing Overheating Check
+                if t_housing is not None and not math.isnan(t_housing):
+                    h_high = self.alarm_config.get("housing", {}).get("high", 90.0)
+                    if t_housing >= h_high:
+                        new_alarms.append({
+                            "code": "ERR_TEMP_HIGH_HOUSING",
+                            "name": "Electronics Housing Overheating",
+                            "desc": f"Electronics housing temp is exceeding maximum threshold of {h_high:.1f}°C (current: {t_housing:.1f}°C)"
                         })
             else:
                 # In Standby, Warmup, Shutdown: clear offline grace timers

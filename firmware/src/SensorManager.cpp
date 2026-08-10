@@ -16,6 +16,7 @@ SensorManager::SensorManager() {
   _tcLiquidReactor = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_LIQUID_REACTOR, PIN_SPI_MISO);
   _tcGasReactorInt = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_GAS_REACTOR_INT, PIN_SPI_MISO);
   _tcGasReactorExt = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_GAS_REACTOR_EXT, PIN_SPI_MISO);
+  _tcElectronicsHousing = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_ELECTRONICS_HOUSING, PIN_SPI_MISO);
 }
 
 void SensorManager::begin() {
@@ -29,12 +30,14 @@ void SensorManager::begin() {
   pinMode(PIN_SPI_CS_TC_LIQUID_REACTOR, OUTPUT);
   pinMode(PIN_SPI_CS_TC_GAS_REACTOR_INT, OUTPUT);
   pinMode(PIN_SPI_CS_TC_GAS_REACTOR_EXT, OUTPUT);
+  pinMode(PIN_SPI_CS_TC_ELECTRONICS_HOUSING, OUTPUT);
 
   digitalWrite(PIN_SPI_CS_TC_FEEDSTOCK_RESERVOIR, HIGH);
   digitalWrite(PIN_SPI_CS_TC_FEEDSTOCK_PREHEATER, HIGH);
   digitalWrite(PIN_SPI_CS_TC_LIQUID_REACTOR, HIGH);
   digitalWrite(PIN_SPI_CS_TC_GAS_REACTOR_INT, HIGH);
   digitalWrite(PIN_SPI_CS_TC_GAS_REACTOR_EXT, HIGH);
+  digitalWrite(PIN_SPI_CS_TC_ELECTRONICS_HOUSING, HIGH);
 
   // Initialize Hardware SPI before TC instances begin
   SPI.begin();
@@ -52,6 +55,8 @@ void SensorManager::begin() {
     Serial.println("TC Gas Reac Int init failed");
   if (!_tcGasReactorExt->begin())
     Serial.println("TC Gas Reac Ext init failed");
+  if (!_tcElectronicsHousing->begin())
+    Serial.println("TC Electronics Housing init failed");
 
   // Initialize Analog H2 Sensor Pin
   pinMode(PIN_H2_SENSOR, INPUT);
@@ -121,12 +126,17 @@ void SensorManager::update() {
   if (isnan(_currentData.tempGasReactorExt))
     _currentData.sensorStatus |= ERR_TC_GAS_REACTOR_EXT;
 
+  _currentData.tempElectronicsHousing = readTc(_tcElectronicsHousing, "ElecHousing");
+  if (isnan(_currentData.tempElectronicsHousing))
+    _currentData.sensorStatus |= ERR_TC_ELECTRONICS_HOUSING;
+
   // Healthy if at least one connected sensor is returning valid readings
   if (isnan(_currentData.tempFeedstockReservoir) &&
       isnan(_currentData.tempFeedstockPreheater) &&
       isnan(_currentData.tempLiquidReactor) &&
       isnan(_currentData.tempGasReactorInt) &&
-      isnan(_currentData.tempGasReactorExt)) {
+      isnan(_currentData.tempGasReactorExt) &&
+      isnan(_currentData.tempElectronicsHousing)) {
     _currentData.sensorsHealthy = false;
   } else {
     _currentData.sensorsHealthy = true;

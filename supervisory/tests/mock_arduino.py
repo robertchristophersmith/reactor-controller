@@ -14,6 +14,7 @@ class MockReactor:
         self.temp_liq_reac = 25.0
         self.temp_gas_reac_int = 25.0
         self.temp_gas_reac_ext = 25.0
+        self.temp_elec_housing = 25.0
 
         self.sp_feed_pre = 0.0
         self.sp_liq_reac = 0.0
@@ -53,6 +54,7 @@ class MockReactor:
         # Gas phase reactor internal and external dynamics
         self.temp_gas_reac_int += (self.heater_gas_reac/1000.0 * 30.0 - (self.temp_gas_reac_int - 25.0) * 0.02) * dt
         self.temp_gas_reac_ext += ((self.temp_gas_reac_int - self.temp_gas_reac_ext) * 0.1 - (self.temp_gas_reac_ext - 25.0) * 0.01) * dt
+        self.temp_elec_housing += random.uniform(-0.05, 0.05)
         
         # Noise
         self.temp_feed_pre += random.uniform(-0.1, 0.1)
@@ -67,6 +69,7 @@ class MockReactor:
                 "t_liq_reac": round(self.temp_liq_reac, 1),
                 "t_gas_reac_int": round(self.temp_gas_reac_int, 1),
                 "t_gas_reac_ext": round(self.temp_gas_reac_ext, 1),
+                "t_elec_housing": round(self.temp_elec_housing, 1),
                 "p_feed": 0.0,
                 "p_reac": 0.0,
                 "flow": 0.0,

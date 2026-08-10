@@ -22,6 +22,7 @@
 #define PIN_SPI_CS_TC_LIQUID_REACTOR 42       // Internal liquid phase reactor
 #define PIN_SPI_CS_TC_GAS_REACTOR_INT 44      // Internal gas phase reactor
 #define PIN_SPI_CS_TC_GAS_REACTOR_EXT 46      // External gas phase reactor
+#define PIN_SPI_CS_TC_ELECTRONICS_HOUSING 36  // Electronics housing temperature monitor
 // --- Analog Inputs ---
 #define PIN_H2_SENSOR A0 // MQ-8 Hydrogen Sensor (Analog Out)
 
@@ -51,6 +52,7 @@
 #define MAX_TEMP_C_PREHEATER 300.0
 #define MAX_TEMP_C_LIQUID_REACTOR 500.0
 #define MAX_TEMP_C_GAS_REACTOR 800.0
+#define MAX_TEMP_C_HOUSING 90.0
 
 // --- Control Loop ---
 #define LOOP_INTERVAL_MS 100 // 10Hz Control Loop

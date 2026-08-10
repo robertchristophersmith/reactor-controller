@@ -12,6 +12,7 @@ struct TcChannel {
 };
 
 TcChannel channels[] = {
+    {"Electronics Housing", 36},
     {"Feedstock Reservoir", 38},
     {"Feedstock Preheater", 40},
     {"Liquid Reactor    ", 42},
@@ -114,7 +115,7 @@ void setup() {
   while (!Serial && millis() < 3000);
 
   Serial.println("\n=======================================================");
-  Serial.println("   MAX31855 Full 5-Channel Diagnostic Scanner Tool    ");
+  Serial.println("   MAX31855 Full 6-Channel Diagnostic Scanner Tool    ");
   Serial.println("   Software SPI: CLK = Pin 7  |  DO (MISO) = Pin 5    ");
   Serial.println("=======================================================");
 
@@ -135,7 +136,7 @@ void setup() {
 
 void loop() {
   Serial.println("\n-------------------------------------------------------");
-  Serial.println("  Scanning All 5 MAX31855 Breakout Channels...");
+  Serial.println("  Scanning All 6 MAX31855 Breakout Channels...");
   Serial.println("-------------------------------------------------------");
 
   for (int i = 0; i < NUM_CHANNELS; i++) {

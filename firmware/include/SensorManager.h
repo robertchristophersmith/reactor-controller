@@ -16,6 +16,7 @@ struct SensorData {
   float tempLiquidReactor;
   float tempGasReactorInt;
   float tempGasReactorExt;
+  float tempElectronicsHousing;
 
   // Analog Sensors
   float h2ConcentrationPpm;
@@ -33,7 +34,8 @@ struct SensorData {
 #define ERR_TC_LIQUID_REACTOR (1 << 2)
 #define ERR_TC_GAS_REACTOR_INT (1 << 3)
 #define ERR_TC_GAS_REACTOR_EXT (1 << 4)
-#define ERR_H2_SENSOR (1 << 5)
+#define ERR_TC_ELECTRONICS_HOUSING (1 << 5)
+#define ERR_H2_SENSOR (1 << 6)
 
 class SensorManager {
 public:
@@ -52,6 +54,7 @@ private:
   Adafruit_MAX31855 *_tcLiquidReactor;
   Adafruit_MAX31855 *_tcGasReactorInt;
   Adafruit_MAX31855 *_tcGasReactorExt;
+  Adafruit_MAX31855 *_tcElectronicsHousing;
 
   HX711 _hx711;
 
