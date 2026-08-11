@@ -8,3 +8,9 @@ if pgrep -f "uvicorn supervisory.app.main:app" > /dev/null; then
 else
     echo "Server is not running."
 fi
+
+# Stop Chromium browser kiosk instances
+if pgrep -f "chromium" > /dev/null; then
+    echo "Stopping Chromium kiosk browser..."
+    pkill -f "chromium"
+fi
