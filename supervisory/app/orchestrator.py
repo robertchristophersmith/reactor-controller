@@ -37,10 +37,10 @@ class Orchestrator:
         self.buzzer_relay = None
         try:
             from gpiozero import OutputDevice
-            # IN1 driven LOW closes relay (buzzer ON), driven HIGH opens relay (buzzer OFF)
-            self.buzzer_relay = OutputDevice(settings.BUZZER_RELAY_PIN, active_high=False, initial_value=False)
+            # IN1 driven HIGH closes relay (buzzer ON), driven LOW opens relay (buzzer OFF)
+            self.buzzer_relay = OutputDevice(settings.BUZZER_RELAY_PIN, active_high=True, initial_value=False)
             self.buzzer_relay.off()
-            logger.info(f"Initialized Buzzer Relay on GPIO {settings.BUZZER_RELAY_PIN} (Active Low)")
+            logger.info(f"Initialized Buzzer Relay on GPIO {settings.BUZZER_RELAY_PIN} (Active High)")
         except Exception as e:
             logger.warning(f"Could not initialize native GPIO buzzer relay: {e}. Falling back to mock relay.")
             class MockRelay:
@@ -61,10 +61,10 @@ class Orchestrator:
         self.stirrer_state = False
         try:
             from gpiozero import OutputDevice
-            # IN2 driven LOW closes relay (stirrer ON), driven HIGH opens relay (stirrer OFF)
-            self.stirrer_relay = OutputDevice(settings.STIRRER_RELAY_PIN, active_high=False, initial_value=False)
+            # IN2 driven HIGH closes relay (stirrer ON), driven LOW opens relay (stirrer OFF)
+            self.stirrer_relay = OutputDevice(settings.STIRRER_RELAY_PIN, active_high=True, initial_value=False)
             self.stirrer_relay.off()
-            logger.info(f"Initialized Stirrer Relay on GPIO {settings.STIRRER_RELAY_PIN} (Active Low)")
+            logger.info(f"Initialized Stirrer Relay on GPIO {settings.STIRRER_RELAY_PIN} (Active High)")
         except Exception as e:
             logger.warning(f"Could not initialize native GPIO stirrer relay: {e}. Falling back to mock relay.")
             class MockStirrerRelay:
