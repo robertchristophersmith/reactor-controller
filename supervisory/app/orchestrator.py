@@ -54,6 +54,29 @@ class Orchestrator:
                 def is_active(self):
                     return self.value
             self.buzzer_relay = MockRelay()
+
+        self.stirrer_relay = None
+        self.stirrer_state = False
+        try:
+            from gpiozero import OutputDevice
+            # IN2 driven LOW closes relay (stirrer ON), driven HIGH opens relay (stirrer OFF)
+            self.stirrer_relay = OutputDevice(settings.STIRRER_RELAY_PIN, active_high=False, initial_value=False)
+            logger.info(f"Initialized Stirrer Relay on GPIO {settings.STIRRER_RELAY_PIN} (Active Low)")
+        except Exception as e:
+            logger.warning(f"Could not initialize native GPIO stirrer relay: {e}. Falling back to mock relay.")
+            class MockStirrerRelay:
+                def __init__(self):
+                    self.value = False
+                def on(self):
+                    self.value = True
+                    logger.debug("MOCK STIRRER RELAY: CLOSED (Stirrer ON)")
+                def off(self):
+                    self.value = False
+                    logger.debug("MOCK STIRRER RELAY: OPEN (Stirrer OFF)")
+                @property
+                def is_active(self):
+                    return self.value
+            self.stirrer_relay = MockStirrerRelay()
         
         # Pump State
         self.pump_mode = "manual"
@@ -346,6 +369,9 @@ class Orchestrator:
                 "auto_dir": self.auto_dir
             }
 
+            # Inject stirrer state into telemetry
+            data["stirrer"] = self.stirrer_state
+
             # 2. Update internal state
             self.latest_state = data
             self.live_buffer.append(data)
@@ -411,6 +437,16 @@ class Orchestrator:
 
     async def set_state(self, state: int):
         await serial_link.send_command({"cmd": "SET_STATE", "state": state})
+
+    def set_stirrer(self, enabled: bool):
+        self.stirrer_state = enabled
+        if self.stirrer_relay:
+            if enabled:
+                self.stirrer_relay.on()
+            else:
+                self.stirrer_relay.off()
+        logger.info(f"Stirrer set to {'ON' if enabled else 'OFF'}")
+        return self.stirrer_state
 
     async def send_tare(self):
         await serial_link.send_command({"cmd": "TARE_LOADCELL"})

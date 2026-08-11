@@ -30,14 +30,15 @@ This guide provides instructions for setting up both the **embedded firmware** (
        - **Liquid Phase Reactor Heater SSR**: Mega **Pin 8** (PWM).
        - **Gas Phase Reactor Heater SSR**: Mega **Pin 9** (PWM).
      - Connect the negative control terminal (-) of all SSRs to the Mega's **GND**.
-    - **Raspberry Pi Buzzer Relay Board (2-Channel)**:
+    - **Raspberry Pi Relay Board (2-Channel)**:
       - **Control Terminals (Pi Header)**:
         - **DC+** -> Connect to Raspberry Pi **5V** (Physical Pin 2 or 4).
         - **DC-** -> Connect to Raspberry Pi **GND** (Physical Pin 6 or any common ground).
-        - **IN1** (Channel 1 Control) -> Connect to Raspberry Pi **GPIO 26** (Physical Pin 37).
-        - **IN2** -> Unused.
-      - **Buzzer Output Terminals**:
-        - Wire the buzzer's external power supply in series through the **COM** (Common) and **NO** (Normally Open) terminals of relay Channel 1.
+        - **IN1** (Channel 1 Control - Buzzer) -> Connect to Raspberry Pi **GPIO 26** (Physical Pin 37).
+        - **IN2** (Channel 2 Control - Overhead Stirrer) -> Connect to Raspberry Pi **GPIO 20** (Physical Pin 38).
+      - **Relay Output Terminals**:
+        - **Channel 1 (Buzzer)**: Wire the buzzer's external power supply in series through the **COM** (Common) and **NO** (Normally Open) terminals.
+        - **Channel 2 (Overhead Stirrer)**: Wire the overhead stirrer's external power supply in series through the **COM** (Common) and **NO** (Normally Open) terminals.
 3. Ensure the TB6600 Stepper Driver is correctly wired to the Uno (Pins 8, 9, 10).
 4. Ensure the Raspberry Pi is connected to the network.
 
