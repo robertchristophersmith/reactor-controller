@@ -12,6 +12,7 @@ import time
 from .config import settings
 
 logger = logging.getLogger("orchestrator")
+logger.setLevel(logging.INFO)
 
 # Buffer for live graph (last 300 points ~ 5 minutes at 1Hz)
 MAX_BUFFER_SIZE = 300
@@ -38,6 +39,7 @@ class Orchestrator:
             from gpiozero import OutputDevice
             # IN1 driven LOW closes relay (buzzer ON), driven HIGH opens relay (buzzer OFF)
             self.buzzer_relay = OutputDevice(settings.BUZZER_RELAY_PIN, active_high=False, initial_value=False)
+            self.buzzer_relay.off()
             logger.info(f"Initialized Buzzer Relay on GPIO {settings.BUZZER_RELAY_PIN} (Active Low)")
         except Exception as e:
             logger.warning(f"Could not initialize native GPIO buzzer relay: {e}. Falling back to mock relay.")
@@ -61,6 +63,7 @@ class Orchestrator:
             from gpiozero import OutputDevice
             # IN2 driven LOW closes relay (stirrer ON), driven HIGH opens relay (stirrer OFF)
             self.stirrer_relay = OutputDevice(settings.STIRRER_RELAY_PIN, active_high=False, initial_value=False)
+            self.stirrer_relay.off()
             logger.info(f"Initialized Stirrer Relay on GPIO {settings.STIRRER_RELAY_PIN} (Active Low)")
         except Exception as e:
             logger.warning(f"Could not initialize native GPIO stirrer relay: {e}. Falling back to mock relay.")
