@@ -21,12 +21,13 @@ else
     echo "Server is already running!"
 fi
 
-# Launch Chromium browser in full-screen kiosk mode and detach it
+# Launch Chromium browser in full-screen kiosk mode with virtual touch keyboard enabled
 echo "Launching browser..."
+CHROMIUM_FLAGS="--password-store=basic --enable-virtual-keyboard --disable-usb-keyboard-detect --touch-events=enabled --kiosk"
 if command -v chromium-browser &> /dev/null; then
-    nohup chromium-browser --password-store=basic --kiosk http://localhost:8000/ > /dev/null 2>&1 &
+    nohup chromium-browser $CHROMIUM_FLAGS http://localhost:8000/ > /dev/null 2>&1 &
 elif command -v chromium &> /dev/null; then
-    nohup chromium --password-store=basic --kiosk http://localhost:8000/ > /dev/null 2>&1 &
+    nohup chromium $CHROMIUM_FLAGS http://localhost:8000/ > /dev/null 2>&1 &
 else
     echo "Error: Chromium browser not found! Please install it with: sudo apt install chromium-browser"
 fi
