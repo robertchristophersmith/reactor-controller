@@ -53,6 +53,7 @@
             const [runStatus, setRunStatus] = useState(null);
             const [sessionReady, setSessionReady] = useState(false);
             const [showAlarmConfig, setShowAlarmConfig] = useState(false);
+            const [alarmMinimized, setAlarmMinimized] = useState(false);
 
             useEffect(() => {
                 fetch('/api/run/status')
@@ -235,51 +236,89 @@
                         </ResponsiveContainer>
                     </div>
 
-                    {/* Critical Alarm Modal */}
+                    {/* Floating Active Alarm Panel (Non-modal) */}
                     {alarms.active && alarms.active.length > 0 && (
-                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                            <div className={`bg-gray-900 border-2 rounded-xl p-6 max-w-lg w-full shadow-2xl flex flex-col gap-4 text-white transition-all ${alarms.silenced ? 'border-yellow-500' : 'border-red-500'}`}>
-                                <div className="flex items-center justify-between border-b border-gray-800 pb-3">
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-3xl animate-bounce">{alarms.silenced ? '🔕' : '🚨'}</span>
+                        <div className="fixed bottom-4 right-4 z-40 max-w-md w-full px-2 pointer-events-auto">
+                            <div className={`bg-gray-900/95 border-2 rounded-xl p-4 shadow-2xl flex flex-col gap-3 text-white transition-all backdrop-blur-md ${alarms.silenced ? 'border-yellow-500 shadow-yellow-900/40' : 'border-red-500 shadow-red-900/50'}`}>
+                                <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-2xl animate-bounce">{alarms.silenced ? '🔕' : '🚨'}</span>
                                         <div>
-                                            <h2 className={`text-xl font-bold uppercase tracking-wide ${alarms.silenced ? 'text-yellow-400' : 'text-red-500'}`}>
-                                                {alarms.silenced ? `SILENCED (${alarms.silence_time_left}s remaining)` : 'CRITICAL ALARM ACTIVE'}
+                                            <h2 className={`text-base font-bold uppercase tracking-wide ${alarms.silenced ? 'text-yellow-400' : 'text-red-500'}`}>
+                                                {alarms.silenced ? `SILENCED (${alarms.silence_time_left}s left)` : `ALARM ACTIVE (${alarms.active.length})`}
                                             </h2>
-                                            <p className="text-xs text-gray-400 font-mono">
-                                                {alarms.silenced ? 'BUZZER RELAY OPEN / MUTED' : 'BUZZER SOUNDING / RELAY CLOSED'}
+                                            <p className="text-[11px] text-gray-400 font-mono">
+                                                {alarms.silenced ? 'Buzzer Muted' : 'Buzzer Sounding'}
                                             </p>
                                         </div>
                                     </div>
+                                    <div className="flex items-center gap-1">
+                                        <button 
+                                            onClick={() => setAlarmMinimized(!alarmMinimized)}
+                                            className="p-1 px-2.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-xs border border-gray-700 transition-all flex items-center gap-1"
+                                            title={alarmMinimized ? "Expand Dialog" : "Minimize Dialog"}
+                                        >
+                                            {alarmMinimized ? '➕ Expand' : '➖ Minimize'}
+                                        </button>
+                                    </div>
                                 </div>
 
-                                <div className="flex flex-col gap-3 max-h-[250px] overflow-y-auto pr-1">
-                                    {alarms.active.map((alarm, idx) => (
-                                        <div key={idx} className="bg-red-950/40 border border-red-900/60 p-3 rounded-lg flex flex-col gap-1">
-                                            <div className="flex justify-between items-center">
-                                                <span className="font-bold text-red-400">{alarm.name}</span>
-                                                <span className="text-xs font-mono bg-red-900/60 text-red-200 px-2 py-0.5 rounded font-bold">{alarm.code}</span>
-                                            </div>
-                                            <p className="text-sm text-gray-300">{alarm.desc}</p>
+                                {!alarmMinimized ? (
+                                    <>
+                                        <div className="flex flex-col gap-2 max-h-[200px] overflow-y-auto pr-1">
+                                            {alarms.active.map((alarm, idx) => (
+                                                <div key={idx} className="bg-red-950/40 border border-red-900/60 p-2.5 rounded-lg flex flex-col gap-0.5 text-xs">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="font-bold text-red-400">{alarm.name}</span>
+                                                        <span className="font-mono bg-red-900/60 text-red-200 px-1.5 py-0.5 rounded text-[10px] font-bold">{alarm.code}</span>
+                                                    </div>
+                                                    <p className="text-gray-300">{alarm.desc}</p>
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
-                                </div>
 
-                                <button 
-                                    onClick={async () => {
-                                        if (!alarms.silenced) {
-                                            await fetch('/api/control/alarm/silence', { method: 'POST' });
-                                        }
-                                    }} 
-                                    disabled={alarms.silenced}
-                                    className={`w-full py-3 font-bold text-lg rounded-lg shadow-lg transition-all ${
-                                        alarms.silenced 
-                                            ? 'bg-gray-700 text-gray-400 opacity-50 cursor-not-allowed border border-gray-600' 
-                                            : 'bg-red-600 hover:bg-red-500 text-white active:scale-95'
-                                    }`}
-                                >
-                                    {alarms.silenced ? `Silenced (${alarms.silence_time_left}s remaining)` : 'Silence Buzzer (5 Min)'}
-                                </button>
+                                        <div className="flex gap-2 pt-1">
+                                            <button 
+                                                onClick={async () => {
+                                                    if (!alarms.silenced) {
+                                                        await fetch('/api/control/alarm/silence', { method: 'POST' });
+                                                    }
+                                                }} 
+                                                disabled={alarms.silenced}
+                                                className={`flex-1 py-2 font-bold text-sm rounded-lg shadow transition-all ${
+                                                    alarms.silenced 
+                                                        ? 'bg-gray-700 text-gray-400 opacity-50 cursor-not-allowed border border-gray-600' 
+                                                        : 'bg-red-600 hover:bg-red-500 text-white active:scale-95'
+                                                }`}
+                                            >
+                                                {alarms.silenced ? `Silenced (${alarms.silence_time_left}s)` : 'Silence Buzzer (5 Min)'}
+                                            </button>
+                                            <button
+                                                onClick={() => sendState(0)}
+                                                className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 font-bold text-xs rounded-lg border border-gray-600 transition-all uppercase tracking-wide"
+                                                title="Switch system to Standby"
+                                            >
+                                                Set Standby
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex justify-between items-center text-xs pt-1">
+                                        <span className="text-gray-300 font-medium truncate max-w-[220px]">
+                                            {alarms.active.map(a => a.name).join(', ')}
+                                        </span>
+                                        {!alarms.silenced && (
+                                            <button 
+                                                onClick={async () => {
+                                                    await fetch('/api/control/alarm/silence', { method: 'POST' });
+                                                }}
+                                                className="bg-red-600 hover:bg-red-500 text-white font-bold px-2.5 py-1 rounded text-xs ml-2 shadow"
+                                            >
+                                                Silence
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
