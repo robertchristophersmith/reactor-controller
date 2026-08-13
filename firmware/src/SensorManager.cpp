@@ -17,6 +17,12 @@ SensorManager::SensorManager() {
   _tcGasReactorInt = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_GAS_REACTOR_INT, PIN_SPI_MISO);
   _tcGasReactorExt = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_GAS_REACTOR_EXT, PIN_SPI_MISO);
   _tcElectronicsHousing = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_ELECTRONICS_HOUSING, PIN_SPI_MISO);
+
+  for (int i = 0; i < 6; i++) {
+    _lastValidTemp[i] = 25.0f; // Default room ambient fallback
+    _errorCount[i] = 0;
+    _lastExactErr[i] = 0;
+  }
 }
 
 void SensorManager::begin() {
@@ -77,70 +83,51 @@ void SensorManager::begin() {
     _hx711.set_scale(1.f); // Default scale
     _hx711.tare();         // Auto-tare on startup
   }
-
-  // Serial.println("Init: Sensors Done");
 }
 
 void SensorManager::update() {
   _currentData.sensorStatus = 0;
 
-  // Helper to read TC and print detailed error diagnostic
-  auto readTc = [&](Adafruit_MAX31855 *tc, const char *name) -> float {
+  // Helper with 3-read transient debouncer and exact error byte extraction
+  auto readTcDebounced = [&](Adafruit_MAX31855 *tc, const char *name, int idx, uint32_t errBit, uint8_t &exactErrOut) -> float {
     float t = tc->readCelsius();
     float internal = tc->readInternal();
     uint8_t err = tc->readError();
 
-    if (isnan(t) || isnan(internal) || err != 0 || (t == 0.0 && internal == 0.0)) {
-      if (err) {
-        Serial.print("TC Error [");
-        Serial.print(name);
-        Serial.print("]: 0x");
-        Serial.print(err, HEX);
-        if (err & 0x01) Serial.print(" (OPEN CIRCUIT)");
-        if (err & 0x02) Serial.print(" (SHORT TO GND)");
-        if (err & 0x04) Serial.print(" (SHORT TO VCC)");
-        Serial.println();
-      }
-      return NAN;
+    bool isError = isnan(t) || isnan(internal) || err != 0 || (t == 0.0 && internal == 0.0);
+
+    if (!isError) {
+      // Valid reading: clear error counter and save last valid temp
+      _errorCount[idx] = 0;
+      _lastExactErr[idx] = 0;
+      _lastValidTemp[idx] = t;
+      exactErrOut = 0;
+      return t;
     }
-    return t;
+
+    // Error detected
+    _errorCount[idx]++;
+    exactErrOut = (err != 0) ? err : 0x08; // 0x08 = NaN / Comm Fault
+    _lastExactErr[idx] = exactErrOut;
+
+    if (_errorCount[idx] < 3) {
+      // Transient error (1 or 2 reads): hold previous valid temp, do NOT set error bit yet
+      return _lastValidTemp[idx];
+    } else {
+      // Persistent error (3+ reads): set error bit and return previous valid temp for safe PID control
+      _currentData.sensorStatus |= errBit;
+      return _lastValidTemp[idx];
+    }
   };
 
-  _currentData.tempFeedstockReservoir = readTc(_tcFeedstockReservoir, "FeedRes");
-  if (isnan(_currentData.tempFeedstockReservoir))
-    _currentData.sensorStatus |= ERR_TC_FEEDSTOCK_RESERVOIR;
+  _currentData.tempFeedstockReservoir = readTcDebounced(_tcFeedstockReservoir, "FeedRes", 0, ERR_TC_FEEDSTOCK_RESERVOIR, _currentData.errFeedstockReservoir);
+  _currentData.tempFeedstockPreheater = readTcDebounced(_tcFeedstockPreheater, "FeedPre", 1, ERR_TC_FEEDSTOCK_PREHEATER, _currentData.errFeedstockPreheater);
+  _currentData.tempLiquidReactor = readTcDebounced(_tcLiquidReactor, "LiqReac", 2, ERR_TC_LIQUID_REACTOR, _currentData.errLiquidReactor);
+  _currentData.tempGasReactorInt = readTcDebounced(_tcGasReactorInt, "GasReacInt", 3, ERR_TC_GAS_REACTOR_INT, _currentData.errGasReactorInt);
+  _currentData.tempGasReactorExt = readTcDebounced(_tcGasReactorExt, "GasReacExt", 4, ERR_TC_GAS_REACTOR_EXT, _currentData.errGasReactorExt);
+  _currentData.tempElectronicsHousing = readTcDebounced(_tcElectronicsHousing, "ElecHousing", 5, ERR_TC_ELECTRONICS_HOUSING, _currentData.errElectronicsHousing);
 
-  _currentData.tempFeedstockPreheater = readTc(_tcFeedstockPreheater, "FeedPre");
-  if (isnan(_currentData.tempFeedstockPreheater))
-    _currentData.sensorStatus |= ERR_TC_FEEDSTOCK_PREHEATER;
-
-  _currentData.tempLiquidReactor = readTc(_tcLiquidReactor, "LiqReac");
-  if (isnan(_currentData.tempLiquidReactor))
-    _currentData.sensorStatus |= ERR_TC_LIQUID_REACTOR;
-
-  _currentData.tempGasReactorInt = readTc(_tcGasReactorInt, "GasReacInt");
-  if (isnan(_currentData.tempGasReactorInt))
-    _currentData.sensorStatus |= ERR_TC_GAS_REACTOR_INT;
-
-  _currentData.tempGasReactorExt = readTc(_tcGasReactorExt, "GasReacExt");
-  if (isnan(_currentData.tempGasReactorExt))
-    _currentData.sensorStatus |= ERR_TC_GAS_REACTOR_EXT;
-
-  _currentData.tempElectronicsHousing = readTc(_tcElectronicsHousing, "ElecHousing");
-  if (isnan(_currentData.tempElectronicsHousing))
-    _currentData.sensorStatus |= ERR_TC_ELECTRONICS_HOUSING;
-
-  // Healthy if at least one connected sensor is returning valid readings
-  if (isnan(_currentData.tempFeedstockReservoir) &&
-      isnan(_currentData.tempFeedstockPreheater) &&
-      isnan(_currentData.tempLiquidReactor) &&
-      isnan(_currentData.tempGasReactorInt) &&
-      isnan(_currentData.tempGasReactorExt) &&
-      isnan(_currentData.tempElectronicsHousing)) {
-    _currentData.sensorsHealthy = false;
-  } else {
-    _currentData.sensorsHealthy = true;
-  }
+  _currentData.sensorsHealthy = (_currentData.sensorStatus == 0);
 
   // Read Analog H2 Sensor (MQ-8)
   int rawH2 = analogRead(PIN_H2_SENSOR);

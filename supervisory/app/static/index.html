@@ -312,17 +312,20 @@
                     <h2 className="text-xl font-bold text-gray-300 mt-4 mb-1">Thermal Control</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         {/* Feedstock Reservoir */}
-                        <SensorCard title="Feedstock Reservoir" value={s.t_feed_res} unit="°C" color="text-teal-400" border="border-teal-500" />
+                        <SensorCard title="Feedstock Reservoir" value={s.t_feed_res} unit="°C" color="text-teal-400" border="border-teal-500"
+                            errorMsg={parseExactError(errMask, 1<<0, s.tc_errors?.t_feed_res)} />
 
                         {/* Feedstock Preheater */}
                         <ZoneCard title="Feedstock Preheater"
                             temp={s.t_feed_pre} sp={sp.feed_pre} out={h.feed_pre}
-                            onSetSp={(v, r) => sendSetpoint(0, v, r)} />
+                            onSetSp={(v, r) => sendSetpoint(0, v, r)}
+                            errorMsg={parseExactError(errMask, 1<<1, s.tc_errors?.t_feed_pre)} />
 
                         {/* Liquid Reactor */}
                         <ZoneCard title="Liquid Reactor"
                             temp={s.t_liq_reac} sp={sp.liq_reac} out={h.liq_reac}
-                            onSetSp={(v, r) => sendSetpoint(1, v, r)} />
+                            onSetSp={(v, r) => sendSetpoint(1, v, r)}
+                            errorMsg={parseExactError(errMask, 1<<2, s.tc_errors?.t_liq_reac)} />
 
                         {/* Gas Reactor */}
                         <ZoneCard title="Gas Reactor"
@@ -331,7 +334,8 @@
                                 : (s.t_gas_reac_ext != null && !isNaN(s.t_gas_reac_ext) ? s.t_gas_reac_ext : s.t_gas_reac_int)}
                             sub={`Int: ${s.t_gas_reac_int != null && !isNaN(s.t_gas_reac_int) ? Number(s.t_gas_reac_int).toFixed(1) + '°C' : 'ERR'} | Ext: ${s.t_gas_reac_ext != null && !isNaN(s.t_gas_reac_ext) ? Number(s.t_gas_reac_ext).toFixed(1) + '°C' : 'ERR'}`}
                             sp={sp.gas_reac} out={h.gas_reac}
-                            onSetSp={(v, r) => sendSetpoint(2, v, r)} />
+                            onSetSp={(v, r) => sendSetpoint(2, v, r)}
+                            errorMsg={parseExactError(errMask, (1<<3)|(1<<4), s.tc_errors?.t_gas_reac_int || s.tc_errors?.t_gas_reac_ext)} />
                     </div>
 
                     {/* Chart */}
@@ -365,6 +369,9 @@
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
+
+                    {/* Sensor Error Log History Table */}
+                    <ErrorLogTable />
 
                     {/* Floating Active Alarm Panel (Non-modal) */}
                     {alarms.active && alarms.active.length > 0 && !alarmDismissed && (
@@ -695,12 +702,24 @@
             );
         }
 
-        function SensorCard({ title, value, unit, color, border, connected }) {
+        function parseExactError(statusMask, bitMask, errCode) {
+            if (!statusMask || !(statusMask & bitMask)) return null;
+            if (!errCode || errCode === 0) return "PERSISTENT FAULT";
+            let parts = [];
+            if (errCode & 0x01) parts.push("Open Circuit (0x01)");
+            if (errCode & 0x02) parts.push("Short to GND (0x02)");
+            if (errCode & 0x04) parts.push("Short to VCC (0x04)");
+            if (errCode & 0x08) parts.push("Comm Fault / NaN (0x08)");
+            return parts.length > 0 ? parts.join(", ") : `Fault 0x${errCode.toString(16)}`;
+        }
+
+        function SensorCard({ title, value, unit, color, border, connected, errorMsg }) {
             const isDisconnected = connected === false;
-            const isValid = value !== null && value !== undefined && !isNaN(value);
+            const hasError = Boolean(errorMsg);
+            const isValid = value !== null && value !== undefined && !isNaN(value) && !hasError;
 
             return (
-                <div className={`bg-gray-800 p-4 rounded-lg border ${border} shadow opacity-90 relative overflow-hidden ${isDisconnected ? 'grayscale opacity-50' : ''}`}>
+                <div className={`bg-gray-800 p-4 rounded-lg border ${hasError ? 'border-red-500 bg-red-950/20' : border} shadow opacity-90 relative overflow-hidden ${isDisconnected ? 'grayscale opacity-50' : ''}`}>
                     {isDisconnected && (
                         <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 z-10 backdrop-blur-sm">
                             <span className="text-red-500 font-bold border border-red-500 px-2 py-1 rounded bg-red-900/20 animate-pulse">DISCONNECTED</span>
@@ -708,22 +727,29 @@
                     )}
                     <h3 className={`text-lg font-semibold mb-2 ${color}`}>{title}</h3>
                     <div>
-                        <div className={`text-4xl font-mono ${isValid ? '' : 'text-red-400 font-bold'}`}>{isValid ? value.toFixed(2) : 'ERR'}</div>
-                        <div className="text-sm text-gray-500">{unit}</div>
+                        <div className={`text-4xl font-mono ${isValid ? '' : 'text-red-400 font-bold'}`}>{isValid ? value.toFixed(2) : (hasError ? 'FAULT' : 'ERR')}</div>
+                        {hasError ? (
+                            <div className="text-xs text-red-400 font-mono mt-1 bg-red-900/40 p-1 rounded border border-red-800 animate-pulse">
+                                ⚠️ {errorMsg}
+                            </div>
+                        ) : (
+                            <div className="text-sm text-gray-500">{unit}</div>
+                        )}
                     </div>
                 </div>
             );
         }
 
-        function ZoneCard({ title, temp, sub, sp, out, onSetSp, connected }) {
+        function ZoneCard({ title, temp, sub, sp, out, onSetSp, connected, errorMsg }) {
             const [val, setVal] = useState(sp);
             const [rate, setRate] = useState(0);
 
             const isDisconnected = connected === false;
-            const isValid = temp !== null && temp !== undefined && !isNaN(temp);
+            const hasError = Boolean(errorMsg);
+            const isValid = temp !== null && temp !== undefined && !isNaN(temp) && !hasError;
 
             return (
-                <div className={`bg-gray-800 p-4 rounded-lg border ${isValid ? 'border-gray-700' : 'border-red-600'} relative overflow-hidden ${isDisconnected ? 'grayscale opacity-50' : ''}`}>
+                <div className={`bg-gray-800 p-4 rounded-lg border ${hasError ? 'border-red-500 bg-red-950/20' : (isValid ? 'border-gray-700' : 'border-red-600')} relative overflow-hidden ${isDisconnected ? 'grayscale opacity-50' : ''}`}>
                     {isDisconnected && (
                         <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 z-10 backdrop-blur-sm">
                             <span className="text-red-500 font-bold border border-red-500 px-2 py-1 rounded bg-red-900/20 animate-pulse">DISCONNECTED</span>
@@ -733,8 +759,14 @@
                     <h3 className="text-lg font-semibold text-gray-300 mb-2">{title}</h3>
                     <div className="flex justify-between items-end mb-4">
                         <div>
-                            <div className={`text-4xl font-mono ${isValid ? '' : 'text-red-400 font-bold'}`}>{isValid ? temp.toFixed(1) + '°C' : 'ERR'}</div>
-                            {sub && <div className="text-xs text-gray-400 font-mono mt-1">{sub}</div>}
+                            <div className={`text-4xl font-mono ${isValid ? '' : 'text-red-400 font-bold'}`}>{isValid ? temp.toFixed(1) + '°C' : (hasError ? 'FAULT' : 'ERR')}</div>
+                            {hasError ? (
+                                <div className="text-[11px] text-red-400 font-mono mt-1 bg-red-900/40 p-1 rounded border border-red-800 animate-pulse">
+                                    ⚠️ {errorMsg}
+                                </div>
+                            ) : (
+                                sub && <div className="text-xs text-gray-400 font-mono mt-1">{sub}</div>
+                            )}
                             <div className="text-sm text-gray-500 mt-1">Output: <span className={out > 0 ? "text-orange-400" : "text-gray-600"}>{(out / 10).toFixed(0)}%</span></div>
                         </div>
                         <div className="text-right">
@@ -760,6 +792,82 @@
                             className="bg-blue-600 px-3 py-1 rounded hover:bg-blue-500 h-9 mt-4 text-sm font-bold uppercase tracking-wide disabled:bg-gray-600"
                             onClick={() => onSetSp(val, rate)} disabled={isDisconnected}>SET</button>
                     </div>
+                </div>
+            );
+        }
+
+        function ErrorLogTable() {
+            const [logs, setLogs] = useState([]);
+
+            const fetchLogs = async () => {
+                try {
+                    const res = await fetch('/api/errors');
+                    const data = await res.json();
+                    if (Array.isArray(data)) {
+                        setLogs(data);
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch error logs", e);
+                }
+            };
+
+            useEffect(() => {
+                fetchLogs();
+                const interval = setInterval(fetchLogs, 3000);
+                return () => clearInterval(interval);
+            }, []);
+
+            return (
+                <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow flex flex-col gap-3">
+                    <div className="flex justify-between items-center border-b border-gray-700 pb-2">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xl">📋</span>
+                            <h2 className="text-lg font-bold text-gray-300">Sensor Error & Fault Log History</h2>
+                        </div>
+                        <button onClick={fetchLogs} className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300 transition-all">
+                            🔄 Refresh Logs
+                        </button>
+                    </div>
+                    {logs.length === 0 ? (
+                        <div className="text-xs text-gray-500 italic p-3 text-center bg-gray-900/50 rounded-lg border border-gray-700/40">
+                            ✓ No persistent sensor faults recorded. All sensors operating nominally.
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto max-h-[250px]">
+                            <table className="w-full text-left text-xs">
+                                <thead className="bg-gray-900 text-gray-400 uppercase font-mono sticky top-0">
+                                    <tr>
+                                        <th className="p-2">Log ID</th>
+                                        <th className="p-2">Fault Start Time</th>
+                                        <th className="p-2">Sensor Component</th>
+                                        <th className="p-2">Exact Error / Diagnostic</th>
+                                        <th className="p-2">Status / Resolution Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-700/60 font-mono">
+                                    {logs.map((log) => (
+                                        <tr key={log.id} className={log.active ? "bg-red-950/40 text-red-200 font-bold" : "text-gray-300 hover:bg-gray-700/30"}>
+                                            <td className="p-2">#{log.id}</td>
+                                            <td className="p-2 whitespace-nowrap">{log.timestamp}</td>
+                                            <td className="p-2 text-cyan-300 font-sans font-bold">{log.sensor}</td>
+                                            <td className="p-2 text-yellow-300">{log.exact_error}</td>
+                                            <td className="p-2 whitespace-nowrap">
+                                                {log.active ? (
+                                                    <span className="bg-red-900/80 text-red-200 border border-red-500 px-2 py-0.5 rounded text-[10px] font-bold animate-pulse">
+                                                        🚨 ACTIVE FAULT
+                                                    </span>
+                                                ) : (
+                                                    <span className="bg-green-950/80 text-green-300 border border-green-700 px-2 py-0.5 rounded text-[10px]">
+                                                        ✓ Cleared At: {log.cleared_timestamp}
+                                                    </span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
             );
         }

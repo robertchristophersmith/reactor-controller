@@ -18,12 +18,20 @@ struct SensorData {
   float tempGasReactorExt;
   float tempElectronicsHousing;
 
+  // Exact MAX31855 Error Bytes (0x01 Open, 0x02 Short GND, 0x04 Short VCC, 0x08 NaN/comm)
+  uint8_t errFeedstockReservoir;
+  uint8_t errFeedstockPreheater;
+  uint8_t errLiquidReactor;
+  uint8_t errGasReactorInt;
+  uint8_t errGasReactorExt;
+  uint8_t errElectronicsHousing;
+
   // Analog Sensors
   float h2ConcentrationPpm;
   float weightKg;
 
   // Status
-  // 0 = OK, Bit set = Fault
+  // 0 = OK, Bit set = Fault (only set after 3 consecutive error reads)
   uint32_t sensorStatus;
   bool sensorsHealthy; // aggregated simple flag
 };
@@ -60,9 +68,10 @@ private:
 
   SensorData _currentData;
 
-  // float readScaled(Adafruit_ADS1115 &ads, int channel, float vMin, float
-  // vMax,
-  //                  float euMin, float euMax);
+  // Debouncing / Transient Filter (6 TC channels)
+  float _lastValidTemp[6];
+  uint8_t _errorCount[6];
+  uint8_t _lastExactErr[6];
 };
 
 #endif

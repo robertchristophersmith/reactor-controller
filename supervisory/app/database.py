@@ -11,6 +11,17 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 class Base(DeclarativeBase):
     pass
 
+from typing import Optional
+
+class ErrorLog(Base):
+    __tablename__ = "error_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    timestamp: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
+    sensor: Mapped[str] = mapped_column()
+    exact_error: Mapped[str] = mapped_column()
+    cleared_timestamp: Mapped[Optional[datetime]] = mapped_column(nullable=True, default=None)
+
 class RunsMetadata(Base):
     __tablename__ = "runs_metadata"
     

@@ -88,6 +88,10 @@ async def get_history(hours: float = 0.5, db: Session = Depends(get_db)):
         return list(orchestrator.live_buffer)
     return get_history_downsampled(db, hours)
 
+@app.get("/api/errors")
+async def get_errors(limit: int = 100, db: Session = Depends(get_db)):
+    return get_error_logs(db, limit)
+
 # --- Run Management Endpoints ---
 
 @app.get("/api/run/status")
@@ -107,6 +111,7 @@ async def start_new_run(run_name: str, db: Session = Depends(get_db)):
     db.query(Logs1s).delete()
     db.query(Logs1m).delete()
     db.query(Logs10m).delete()
+    db.query(ErrorLog).delete()
     db.query(RunsMetadata).delete()
     
     # Create new run

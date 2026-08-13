@@ -91,6 +91,14 @@ void SerialComms::sendTelemetry(const SensorData &sensors,
   setTc("t_elec_housing", sensors.tempElectronicsHousing);
   s["h2"] = sensors.h2ConcentrationPpm;
 
+  JsonObject errs = s.createNestedObject("tc_errors");
+  errs["t_feed_res"] = sensors.errFeedstockReservoir;
+  errs["t_feed_pre"] = sensors.errFeedstockPreheater;
+  errs["t_liq_reac"] = sensors.errLiquidReactor;
+  errs["t_gas_reac_int"] = sensors.errGasReactorInt;
+  errs["t_gas_reac_ext"] = sensors.errGasReactorExt;
+  errs["t_elec_housing"] = sensors.errElectronicsHousing;
+
   // Heaters
   JsonObject h = doc.createNestedObject("heaters");
   h["feed_pre"] = heaters.getOutputPreheater();

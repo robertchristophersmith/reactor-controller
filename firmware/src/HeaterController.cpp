@@ -61,6 +61,7 @@ void HeaterController::setEnabled(bool enabled) {
     _outLiquid = 0;
     _outGas = 0;
   } else {
+    _windowStartTime = millis(); // Reset PWM window start timestamp immediately
     _pidPreheater->SetMode(AUTOMATIC);
     _pidLiquid->SetMode(AUTOMATIC);
     _pidGas->SetMode(AUTOMATIC);
@@ -75,28 +76,51 @@ void HeaterController::update(float tempPreheater, float tempLiquid, float tempG
     return;
   }
 
+  // Time Proportional Window Reset (Fix stale window drift)
+  unsigned long now = millis();
+  if (now - _windowStartTime >= WINDOW_SIZE || now < _windowStartTime) {
+    _windowStartTime = now;
+  }
+
+  // Helper for thermal control with strict over-temp cutoff and anti-windup
+  auto processZone = [&](float temp, double sp, PID *pid, double &outVal, int pin) {
+    if (isnan(temp) || sp <= 0.0) {
+      outVal = 0.0;
+      digitalWrite(pin, LOW);
+      return;
+    }
+
+    if (temp >= sp) {
+      // STRICT OVER-TEMP CUTOFF: Shutdown heater immediately when at or above setpoint
+      outVal = 0.0;
+      digitalWrite(pin, LOW);
+      // Clear integral windup
+      pid->SetMode(MANUAL);
+      pid->SetMode(AUTOMATIC);
+    } else if (temp < sp - 20.0f) {
+      // WARM-UP BAND: Full 100% power for rapid warm-up without integral accumulation
+      outVal = (double)WINDOW_SIZE;
+      applyTimeProportional(pin, outVal);
+    } else {
+      // PROPORTIONAL BAND: PID Control as temperature approaches setpoint
+      pid->Compute();
+      applyTimeProportional(pin, outVal);
+    }
+  };
+
   _inPreheater = tempPreheater;
   _inLiquid = tempLiquid;
   _inGas = tempGas;
 
-  _pidPreheater->Compute();
-  _pidLiquid->Compute();
-  _pidGas->Compute();
-
-  // Time Proportional Logic
-  unsigned long now = millis();
-  if (now - _windowStartTime > WINDOW_SIZE) {
-    _windowStartTime += WINDOW_SIZE;
-  }
-
-  applyTimeProportional(PIN_HEATER_FEEDSTOCK_PREHEATER, _outPreheater);
-  applyTimeProportional(PIN_HEATER_LIQUID_REACTOR, _outLiquid);
-  applyTimeProportional(PIN_HEATER_GAS_REACTOR, _outGas);
+  processZone(tempPreheater, _spPreheater, _pidPreheater, _outPreheater, PIN_HEATER_FEEDSTOCK_PREHEATER);
+  processZone(tempLiquid, _spLiquid, _pidLiquid, _outLiquid, PIN_HEATER_LIQUID_REACTOR);
+  processZone(tempGas, _spGas, _pidGas, _outGas, PIN_HEATER_GAS_REACTOR);
 }
 
 void HeaterController::applyTimeProportional(int pin, double output) {
   unsigned long now = millis();
-  if (output > (now - _windowStartTime)) {
+  unsigned long elapsed = now - _windowStartTime;
+  if (output > 0 && elapsed < (unsigned long)output) {
     digitalWrite(pin, HIGH);
   } else {
     digitalWrite(pin, LOW);

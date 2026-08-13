@@ -97,7 +97,7 @@ void loop() {
     SensorData data = sensors.getLastReadings();
 
     // B. Check Safety (Hard Limits)
-    // checkSafety(data); // DISABLED: Removing FSM dependency
+    checkSafety(data);
 
     // C. Update FSM (Logic for each state)
     updateFSM(data);
@@ -112,9 +112,14 @@ void loop() {
       instantGas = data.tempGasReactorInt;
     }
 
-    wAvgGas.add(instantGas);
+    if (!isnan(instantGas)) {
+      wAvgGas.add(instantGas);
+    }
 
     float pvGas = wAvgGas.getAverage();
+    if ((pvGas == 0.0f || isnan(pvGas)) && !isnan(instantGas)) {
+      pvGas = instantGas;
+    }
 
     // D. Update Heaters (PID calculation)
     heaters.update(data.tempFeedstockPreheater, data.tempLiquidReactor, pvGas);
@@ -126,41 +131,19 @@ void loop() {
                           (now - startTime) / 1000);
     }
   }
-
-  // 3. Watchdog Check
-  /* 
-  // DISABLED: Removing FSM dependency
-  if (now - lastHeartbeatTime > HEARTBEAT_TIMEOUT) {
-    if (currentState != STATE_FAULT && currentState != STATE_ALARM &&
-        currentState != STATE_STANDBY) {
-      currentState = STATE_ALARM;
-      comms.sendError("HEARTBEAT_TIMEOUT");
-    }
-  }
-  */
 }
 
 void checkSafety(SensorData &data) {
-  // Immediate overrides regardless of state
-  /* 
-  // TEMPORARILY DISABLED: Not using temps currently
-  if (data.tempGasInternal > MAX_TEMP_C_GAS ||
-      data.tempReactorInt1 > MAX_TEMP_C_REACTOR ||
-      data.pressureReactorBar > MAX_PRESSURE_BAR) {
-
+  if ((!isnan(data.tempFeedstockPreheater) && data.tempFeedstockPreheater > MAX_TEMP_C_PREHEATER) ||
+      (!isnan(data.tempLiquidReactor) && data.tempLiquidReactor > MAX_TEMP_C_LIQUID_REACTOR) ||
+      (!isnan(data.tempGasReactorInt) && data.tempGasReactorInt > MAX_TEMP_C_GAS_REACTOR) ||
+      (!isnan(data.tempGasReactorExt) && data.tempGasReactorExt > MAX_TEMP_C_GAS_REACTOR) ||
+      (!isnan(data.tempElectronicsHousing) && data.tempElectronicsHousing > MAX_TEMP_C_HOUSING)) {
     if (currentState != STATE_FAULT) {
       currentState = STATE_FAULT;
-      comms.sendError("SAFETY_LIMIT_EXCEEDED");
+      comms.sendError("THERMAL_SAFETY_LIMIT_EXCEEDED");
     }
   }
-
-  if (!data.sensorsHealthy) {
-    if (currentState != STATE_FAULT) {
-      currentState = STATE_FAULT;
-      comms.sendError("SENSOR_FAILURE");
-    }
-  }
-  */
 }
 
 void updateFSM(SensorData &data) {

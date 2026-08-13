@@ -1,6 +1,38 @@
 from sqlalchemy.orm import Session
-from .database import Logs1s, Logs1m, Logs10m, RunsMetadata
+from .database import Logs1s, Logs1m, Logs10m, RunsMetadata, ErrorLog
 from datetime import datetime, timedelta
+
+def create_error_log(db: Session, sensor: str, exact_error: str) -> ErrorLog:
+    log = ErrorLog(
+        timestamp=datetime.utcnow(),
+        sensor=sensor,
+        exact_error=exact_error,
+        cleared_timestamp=None
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+    return log
+
+def resolve_error_log(db: Session, log_id: int):
+    log = db.query(ErrorLog).filter(ErrorLog.id == log_id).first()
+    if log and log.cleared_timestamp is None:
+        log.cleared_timestamp = datetime.utcnow()
+        db.commit()
+
+def get_error_logs(db: Session, limit: int = 100):
+    logs = db.query(ErrorLog).order_by(ErrorLog.id.desc()).limit(limit).all()
+    result = []
+    for log in logs:
+        result.append({
+            "id": log.id,
+            "timestamp": log.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            "sensor": log.sensor,
+            "exact_error": log.exact_error,
+            "cleared_timestamp": log.cleared_timestamp.strftime("%Y-%m-%d %H:%M:%S") if log.cleared_timestamp else None,
+            "active": log.cleared_timestamp is None
+        })
+    return result
 
 def create_log(db: Session, data: dict, uptime: float, state: int):
     # Map dictionary keys (from JSON) to Model fields

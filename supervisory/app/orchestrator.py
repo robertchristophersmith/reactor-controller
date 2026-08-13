@@ -93,6 +93,7 @@ class Orchestrator:
         self.weight_history = deque()
         self.next_eval_time = 0
         self.last_telemetry_time = 0.0
+        self.active_db_errors = {}
         
         # Connect Motor Override Callback
         motor_controller.override_callback = self.handle_manual_override
@@ -362,7 +363,13 @@ class Orchestrator:
             self.weight_history.append((now, current_weight))
             while self.weight_history and self.weight_history[0][0] < now - 60:
                 self.weight_history.popleft()
-                    
+
+            # Process Persistent Database Error Logging
+            try:
+                self.process_error_logging(data)
+            except Exception as e:
+                logger.error(f"Error processing persistent DB error logging: {e}")
+
             # Inject physical pump state into telemetry
             data["pump"] = {
                 "connected": motor_controller.connected,
@@ -405,6 +412,49 @@ class Orchestrator:
         except Exception as e:
             logger.error(f"Error in handle_telemetry: {e}")
             print(f"CRITICAL ORCHESTRATOR ERROR: {e}")
+
+    def process_error_logging(self, data: dict):
+        s = data.get("sensors", {})
+        status_mask = s.get("status", 0)
+        tc_errors = s.get("tc_errors", {})
+
+        tc_definitions = [
+            ("t_feed_res", (1 << 0), "Feedstock Reservoir TC"),
+            ("t_feed_pre", (1 << 1), "Feedstock Preheater TC"),
+            ("t_liq_reac", (1 << 2), "Liquid Reactor TC"),
+            ("t_gas_reac_int", (1 << 3), "Gas Reactor Int TC"),
+            ("t_gas_reac_ext", (1 << 4), "Gas Reactor Ext TC"),
+            ("t_elec_housing", (1 << 5), "Electronics Housing TC")
+        ]
+
+        def format_exact_err(err_code: int) -> str:
+            if err_code == 0:
+                return "OK"
+            details = []
+            if err_code & 0x01: details.append("Open Circuit (0x01)")
+            if err_code & 0x02: details.append("Short to GND (0x02)")
+            if err_code & 0x04: details.append("Short to VCC (0x04)")
+            if err_code & 0x08: details.append("Comm Fault / NaN (0x08)")
+            return "MAX31855 " + (", ".join(details) if details else f"Fault (0x{err_code:02X})")
+
+        try:
+            with SessionLocal() as db:
+                from .crud import create_error_log, resolve_error_log
+                for key, bit, label in tc_definitions:
+                    is_persistent_fault = bool(status_mask & bit)
+                    err_code = tc_errors.get(key, 0x08 if is_persistent_fault else 0)
+
+                    if is_persistent_fault:
+                        if key not in self.active_db_errors:
+                            exact_str = format_exact_err(err_code)
+                            log_obj = create_error_log(db, label, exact_str)
+                            self.active_db_errors[key] = log_obj.id
+                    else:
+                        if key in self.active_db_errors:
+                            resolve_error_log(db, self.active_db_errors[key])
+                            del self.active_db_errors[key]
+        except Exception as err:
+            logger.error(f"Failed to record/resolve DB error log: {err}")
 
     async def rollup_1m_loop(self):
         while True:
