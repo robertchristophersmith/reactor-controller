@@ -92,11 +92,13 @@ class Orchestrator:
         
         self.weight_history = deque()
         self.next_eval_time = 0
+        self.last_telemetry_time = 0.0
         
         # Connect Motor Override Callback
         motor_controller.override_callback = self.handle_manual_override
         self.auto_task = None
         self.poll_task = None
+        self.heartbeat_task = None
 
     def load_alarm_config(self):
         defaults = {
@@ -179,10 +181,13 @@ class Orchestrator:
         self.auto_task = asyncio.create_task(self.auto_mode_loop())
         self.r1m_task = asyncio.create_task(self.rollup_1m_loop())
         self.r10m_task = asyncio.create_task(self.rollup_10m_loop())
+        self.heartbeat_task = asyncio.create_task(self.heartbeat_loop())
 
     async def handle_telemetry(self, data: dict):
         try:
             now = time.time()
+            self.last_telemetry_time = now
+            data["serial_connected"] = True
 
             # 1. Update Ramps
             active_ramps = list(self.ramps.keys())
@@ -410,6 +415,54 @@ class Orchestrator:
                     perform_1m_rollup(db)
             except Exception as e:
                 logger.error(f"1m Rollup Error: {e}")
+
+    async def heartbeat_loop(self):
+        start_time = time.time()
+        while True:
+            await asyncio.sleep(1)
+            now = time.time()
+            if now - self.last_telemetry_time > 2.0:
+                offline_state = {
+                    "uptime": round(now - start_time, 1),
+                    "state": 0,
+                    "serial_connected": False,
+                    "sensors": {
+                        "status": 0x3F,
+                        "weight": 0.0,
+                        "t_feed_res": None,
+                        "t_feed_pre": None,
+                        "t_liq_reac": None,
+                        "t_gas_reac_int": None,
+                        "t_gas_reac_ext": None,
+                        "h2": 0.0
+                    },
+                    "heaters": {"feed_pre": 0.0, "liq_reac": 0.0, "gas_reac": 0.0},
+                    "sp": {"feed_pre": 0.0, "liq_reac": 0.0, "gas_reac": 0.0},
+                    "alarms": {
+                        "active": [],
+                        "silenced": False,
+                        "silence_time_left": 0.0
+                    },
+                    "pump": {
+                        "connected": motor_controller.connected,
+                        "error": motor_controller.error_msg,
+                        "mode": self.pump_mode,
+                        "running": motor_controller.physical_running,
+                        "dir": motor_controller.physical_dir,
+                        "speed": motor_controller.physical_speed,
+                        "auto_min": self.auto_min,
+                        "auto_max": self.auto_max,
+                        "auto_rec_rpm": self.auto_rec_rpm,
+                        "auto_dir": self.auto_dir
+                    },
+                    "stirrer": self.stirrer_state
+                }
+                self.latest_state = offline_state
+                for q in list(self.subscribers):
+                    try:
+                        await q.put(offline_state)
+                    except Exception:
+                        self.subscribers.remove(q)
 
     async def rollup_10m_loop(self):
         while True:

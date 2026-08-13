@@ -163,25 +163,25 @@
                 ws.onclose = () => setStatus("DISCONNECTED");
 
                 ws.onmessage = (event) => {
-                    const msg = JSON.parse(event.data);
-                    
-                    if (msg.event === "manual_override") {
-                        // We received a manual override from the backend
-                        // The backend already updated its own state, so the next telemetry will have pump.mode = 'manual'
-                        // We can alert the user
-                        console.warn("Physical manual override detected!");
-                        return; // Don't process this as a telemetry packet
-                    }
-                    
-                    // Add ts for graph
-                    msg.ts = new Date().toLocaleTimeString();
+                    try {
+                        const msg = JSON.parse(event.data);
+                        
+                        if (msg.event === "manual_override") {
+                            console.warn("Physical manual override detected!");
+                            return;
+                        }
+                        
+                        msg.ts = new Date().toLocaleTimeString();
 
-                    setLatest(msg);
-                    setData(prev => {
-                        const next = [...prev, msg];
-                        if (next.length > 400) next.shift(); // Max 400 points to keep history + live
-                        return next;
-                    });
+                        setLatest(msg);
+                        setData(prev => {
+                            const next = [...prev, msg];
+                            if (next.length > 400) next.shift();
+                            return next;
+                        });
+                    } catch (err) {
+                        console.error("Failed to parse WebSocket telemetry packet", err);
+                    }
                 };
 
                 return () => ws.close();
@@ -229,20 +229,25 @@
                 return <RunManagerModal status={runStatus} onComplete={() => setSessionReady(true)} />;
             }
 
-            if (!latest) return <div className="p-10 text-center text-gray-400 animate-pulse">Waiting for telemetry...</div>;
-
-            const s = latest.sensors || {};
-            const h = latest.heaters || {};
-            const sp = latest.sp || {};
-            const stateIdx = latest.state || 0;
+            const l = latest || {};
+            const s = l.sensors || {};
+            const h = l.heaters || {};
+            const sp = l.sp || {};
+            const stateIdx = l.state || 0;
             const errMask = s.status || 0;
-            const alarms = latest.alarms || { active: [], silenced: false, silence_time_left: 0.0 };
+            const alarms = l.alarms || { active: [], silenced: false, silence_time_left: 0.0 };
+            const isConnected = status === "CONNECTED" && l.serial_connected !== false;
 
             return (
                 <div className="min-h-screen p-4 flex flex-col gap-4">
                     {/* Header */}
                     <header className="bg-gray-800 p-4 rounded-lg shadow-lg flex justify-between items-center border-b border-gray-700">
-                        <h1 className="text-2xl font-bold tracking-tight text-blue-400">Reactor Controller</h1>
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-2xl font-bold tracking-tight text-blue-400">Reactor Controller</h1>
+                            <span className={`px-2 py-0.5 rounded text-xs font-bold font-mono border ${isConnected ? 'bg-green-950 text-green-400 border-green-700' : 'bg-red-950 text-red-400 border-red-700 animate-pulse'}`}>
+                                {isConnected ? "CONNECTED" : (latest ? "HARDWARE OFFLINE" : "CONNECTING...")}
+                            </span>
+                        </div>
                         <div className="flex gap-4 items-center">
                             {alarms.active && alarms.active.length > 0 && (
                                 <button 
@@ -272,7 +277,7 @@
                             <div className={`text-xl font-bold px-3 py-1 rounded bg-gray-900 ${STATE_COLORS[stateIdx]}`}>
                                 {STATE_LABELS[stateIdx] || "UNKNOWN"}
                             </div>
-                            <div className="text-sm text-gray-400 font-mono">uptime: {latest.uptime}s</div>
+                            <div className="text-sm text-gray-400 font-mono">uptime: {l.uptime ?? 0}s</div>
                         </div>
                     </header>
 
@@ -289,7 +294,7 @@
                     {/* Process Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         {/* Feedstock Pump */}
-                        <PumpCard pump={latest.pump} />
+                        <PumpCard pump={l.pump} />
 
                         {/* Load Cell */}
                         <LoadCellCard weight={s.weight} 
@@ -297,7 +302,7 @@
                             onCalibrate={(w) => fetch(`/api/control/calibrate?value=${w}`, { method: 'POST' })} />
 
                         {/* Overhead Stirrer */}
-                        <StirrerCard stirrerState={latest.stirrer} />
+                        <StirrerCard stirrerState={l.stirrer} />
 
                         {/* H2 Sensor */}
                         <SensorCard title="H2 Sensor" value={s.h2} unit="ppm" color="text-pink-400" border="border-pink-500" />
