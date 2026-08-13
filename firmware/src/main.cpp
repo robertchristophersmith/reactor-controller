@@ -100,7 +100,7 @@ void loop() {
     // checkSafety(data); // DISABLED: Removing FSM dependency
 
     // C. Update FSM (Logic for each state)
-    // updateFSM(data); // DISABLED: Removing FSM dependency
+    updateFSM(data);
 
     // Calc Weighted PVs (70% Internal / 30% External) for Gas Reactor
     float instantGas = NAN;
@@ -170,13 +170,11 @@ void updateFSM(SensorData &data) {
     break;
 
   case STATE_WARMUP:
-    // TEMPORARILY DISABLED: "no actions are triggered"
-    heaters.setEnabled(false);
+    heaters.setEnabled(true);
     break;
 
   case STATE_WORKING:
-    // TEMPORARILY DISABLED: "no actions are triggered"
-    heaters.setEnabled(false);
+    heaters.setEnabled(true);
     break;
 
   case STATE_ALARM:
