@@ -187,6 +187,34 @@
                 return () => ws.close();
             }, [sessionReady]);
 
+            const activeAlarmCodes = (latest?.alarms?.active || []).map(a => a.code).sort().join(",");
+            const activeAlarmsList = latest?.alarms?.active || [];
+            const isAlarmsSilenced = Boolean(latest?.alarms?.silenced);
+
+            useEffect(() => {
+                if (activeAlarmCodes && activeAlarmCodes !== prevAlarmCodesRef.current) {
+                    setAlarmDismissed(false);
+                    prevAlarmCodesRef.current = activeAlarmCodes;
+                } else if (!activeAlarmCodes) {
+                    prevAlarmCodesRef.current = "";
+                    setAlarmDismissed(false);
+                }
+            }, [activeAlarmCodes]);
+
+            useEffect(() => {
+                webBuzzer.setMuted(audioMuted);
+            }, [audioMuted]);
+
+            useEffect(() => {
+                const shouldBuzzerSound = activeAlarmsList.length > 0 && !isAlarmsSilenced;
+                if (shouldBuzzerSound && !audioMuted) {
+                    webBuzzer.start();
+                } else {
+                    webBuzzer.stop();
+                }
+                return () => webBuzzer.stop();
+            }, [activeAlarmsList.length, isAlarmsSilenced, audioMuted]);
+
             const sendState = async (s) => {
                 await fetch(`/api/control/state/${s}`, { method: 'POST' });
             }
@@ -209,31 +237,6 @@
             const stateIdx = latest.state || 0;
             const errMask = s.status || 0;
             const alarms = latest.alarms || { active: [], silenced: false, silence_time_left: 0.0 };
-
-            const activeAlarmCodes = (latest?.alarms?.active || []).map(a => a.code).sort().join(",");
-            useEffect(() => {
-                if (activeAlarmCodes && activeAlarmCodes !== prevAlarmCodesRef.current) {
-                    setAlarmDismissed(false);
-                    prevAlarmCodesRef.current = activeAlarmCodes;
-                } else if (!activeAlarmCodes) {
-                    prevAlarmCodesRef.current = "";
-                    setAlarmDismissed(false);
-                }
-            }, [activeAlarmCodes]);
-
-            useEffect(() => {
-                webBuzzer.setMuted(audioMuted);
-            }, [audioMuted]);
-
-            useEffect(() => {
-                const shouldBuzzerSound = alarms.active && alarms.active.length > 0 && !alarms.silenced;
-                if (shouldBuzzerSound && !audioMuted) {
-                    webBuzzer.start();
-                } else {
-                    webBuzzer.stop();
-                }
-                return () => webBuzzer.stop();
-            }, [alarms.active?.length, alarms.silenced, audioMuted]);
 
             return (
                 <div className="min-h-screen p-4 flex flex-col gap-4">
