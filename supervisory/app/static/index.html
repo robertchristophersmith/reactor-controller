@@ -54,6 +54,8 @@
             const [sessionReady, setSessionReady] = useState(false);
             const [showAlarmConfig, setShowAlarmConfig] = useState(false);
             const [alarmMinimized, setAlarmMinimized] = useState(false);
+            const [alarmDismissed, setAlarmDismissed] = useState(false);
+            const prevAlarmCodesRef = useRef("");
 
             useEffect(() => {
                 fetch('/api/run/status')
@@ -131,12 +133,33 @@
             const errMask = s.status || 0;
             const alarms = latest.alarms || { active: [], silenced: false, silence_time_left: 0.0 };
 
+            const activeAlarmCodes = (latest?.alarms?.active || []).map(a => a.code).sort().join(",");
+            useEffect(() => {
+                if (activeAlarmCodes && activeAlarmCodes !== prevAlarmCodesRef.current) {
+                    setAlarmDismissed(false);
+                    prevAlarmCodesRef.current = activeAlarmCodes;
+                } else if (!activeAlarmCodes) {
+                    prevAlarmCodesRef.current = "";
+                    setAlarmDismissed(false);
+                }
+            }, [activeAlarmCodes]);
+
             return (
                 <div className="min-h-screen p-4 flex flex-col gap-4">
                     {/* Header */}
                     <header className="bg-gray-800 p-4 rounded-lg shadow-lg flex justify-between items-center border-b border-gray-700">
                         <h1 className="text-2xl font-bold tracking-tight text-blue-400">Reactor Controller</h1>
                         <div className="flex gap-4 items-center">
+                            {alarms.active && alarms.active.length > 0 && (
+                                <button 
+                                    onClick={() => { setAlarmDismissed(false); setAlarmMinimized(false); }}
+                                    className={`px-3 py-1 rounded text-xs font-bold transition-all shadow flex items-center gap-1.5 animate-pulse ${alarms.silenced ? 'bg-yellow-900/80 border border-yellow-500 text-yellow-300 hover:bg-yellow-800' : 'bg-red-900/80 border border-red-500 text-red-200 hover:bg-red-800'}`}
+                                    title="Click to show active alarm details"
+                                >
+                                    <span>{alarms.silenced ? '🔕' : '🚨'}</span>
+                                    <span>{alarms.active.length} ALARM{alarms.active.length > 1 ? 'S' : ''} ACTIVE</span>
+                                </button>
+                            )}
                             <button 
                                 onClick={() => setShowAlarmConfig(true)}
                                 className="p-2 rounded bg-gray-700 hover:bg-gray-600 text-gray-200 text-lg transition-all shadow"
@@ -237,7 +260,7 @@
                     </div>
 
                     {/* Floating Active Alarm Panel (Non-modal) */}
-                    {alarms.active && alarms.active.length > 0 && (
+                    {alarms.active && alarms.active.length > 0 && !alarmDismissed && (
                         <div className="fixed bottom-4 right-4 z-40 max-w-md w-full px-2 pointer-events-auto">
                             <div className={`bg-gray-900/95 border-2 rounded-xl p-4 shadow-2xl flex flex-col gap-3 text-white transition-all backdrop-blur-md ${alarms.silenced ? 'border-yellow-500 shadow-yellow-900/40' : 'border-red-500 shadow-red-900/50'}`}>
                                 <div className="flex items-center justify-between border-b border-gray-800 pb-2">
@@ -259,6 +282,13 @@
                                             title={alarmMinimized ? "Expand Dialog" : "Minimize Dialog"}
                                         >
                                             {alarmMinimized ? '➕ Expand' : '➖ Minimize'}
+                                        </button>
+                                        <button 
+                                            onClick={() => setAlarmDismissed(true)}
+                                            className="p-1 px-2 rounded bg-gray-800 hover:bg-red-900/60 hover:border-red-500 text-gray-400 hover:text-red-200 font-bold text-xs border border-gray-700 transition-all"
+                                            title="Hide Notification Window"
+                                        >
+                                            ✕
                                         </button>
                                     </div>
                                 </div>
@@ -300,23 +330,39 @@
                                             >
                                                 Set Standby
                                             </button>
+                                            <button
+                                                onClick={() => setAlarmDismissed(true)}
+                                                className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-xs rounded-lg border border-gray-600 transition-all"
+                                                title="Hide Window"
+                                            >
+                                                Hide
+                                            </button>
                                         </div>
                                     </>
                                 ) : (
                                     <div className="flex justify-between items-center text-xs pt-1">
-                                        <span className="text-gray-300 font-medium truncate max-w-[220px]">
+                                        <span className="text-gray-300 font-medium truncate max-w-[200px]">
                                             {alarms.active.map(a => a.name).join(', ')}
                                         </span>
-                                        {!alarms.silenced && (
+                                        <div className="flex items-center gap-1.5">
+                                            {!alarms.silenced && (
+                                                <button 
+                                                    onClick={async () => {
+                                                        await fetch('/api/control/alarm/silence', { method: 'POST' });
+                                                    }}
+                                                    className="bg-red-600 hover:bg-red-500 text-white font-bold px-2 py-1 rounded text-xs shadow"
+                                                >
+                                                    Silence
+                                                </button>
+                                            )}
                                             <button 
-                                                onClick={async () => {
-                                                    await fetch('/api/control/alarm/silence', { method: 'POST' });
-                                                }}
-                                                className="bg-red-600 hover:bg-red-500 text-white font-bold px-2.5 py-1 rounded text-xs ml-2 shadow"
+                                                onClick={() => setAlarmDismissed(true)}
+                                                className="bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white px-2 py-1 rounded text-xs border border-gray-700"
+                                                title="Hide Window"
                                             >
-                                                Silence
+                                                Hide
                                             </button>
-                                        )}
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -368,11 +414,11 @@
             };
 
             return (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                    <div className="bg-gray-800 border border-gray-600 rounded-xl p-6 max-w-md w-full shadow-2xl flex flex-col gap-4 text-white">
+                <div className="fixed top-16 right-4 z-50 max-w-md w-full p-2 pointer-events-auto">
+                    <div className="bg-gray-800/95 border-2 border-blue-500/80 rounded-xl p-5 shadow-2xl flex flex-col gap-4 text-white backdrop-blur-md">
                         <div className="flex justify-between items-center border-b border-gray-700 pb-3">
                             <h2 className="text-xl font-bold text-blue-400">⚙ Alarm Temperature Limits</h2>
-                            <button onClick={onClose} className="text-gray-400 hover:text-white font-bold text-xl">&times;</button>
+                            <button onClick={onClose} className="text-gray-400 hover:text-white font-bold text-xl px-2 py-0.5 rounded hover:bg-gray-700 transition-all">&times;</button>
                         </div>
 
                         {msg && <div className="bg-green-900/60 border border-green-700 text-green-300 p-2 rounded text-center text-sm font-bold">{msg}</div>}
