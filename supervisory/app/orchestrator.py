@@ -94,6 +94,7 @@ class Orchestrator:
         self.next_eval_time = 0
         self.last_telemetry_time = 0.0
         self.active_db_errors = {}
+        self.warmup_stable_start = None
         
         # Connect Motor Override Callback
         motor_controller.override_callback = self.handle_manual_override
@@ -331,6 +332,50 @@ class Orchestrator:
             else:
                 # In Standby, Warmup, Shutdown: clear offline grace timers
                 self.tc_offline_start = {}
+
+            # Automatic transition check from WARMUP (State 1) -> WORKING (State 2)
+            if current_state == 1:
+                sp_map = data.get("sp", {})
+                sp_pre = sp_map.get("feed_pre", 0.0)
+                sp_liq = sp_map.get("liq_reac", 0.0)
+                sp_gas = sp_map.get("gas_reac", 0.0)
+
+                t_pre = s.get("t_feed_pre")
+                t_liq = s.get("t_liq_reac")
+                t_gas_int = s.get("t_gas_reac_int")
+                t_gas_ext = s.get("t_gas_reac_ext")
+
+                gas_avg = None
+                if t_gas_int is not None and t_gas_ext is not None and not math.isnan(t_gas_int) and not math.isnan(t_gas_ext):
+                    gas_avg = t_gas_int * 0.7 + t_gas_ext * 0.3
+                elif t_gas_int is not None and not math.isnan(t_gas_int):
+                    gas_avg = t_gas_int
+
+                def is_zone_satisfied(sp_val, act_val):
+                    if sp_val == 0.0:
+                        return True  # 0.0 setpoint means heating disabled for zone
+                    if act_val is None or math.isnan(act_val):
+                        return False # Sensor invalid or offline
+                    return abs(act_val - sp_val) <= 5.0
+
+                zones_satisfied = (
+                    len(self.ramps) == 0 and
+                    is_zone_satisfied(sp_pre, t_pre) and
+                    is_zone_satisfied(sp_liq, t_liq) and
+                    is_zone_satisfied(sp_gas, gas_avg)
+                )
+
+                if zones_satisfied:
+                    if self.warmup_stable_start is None:
+                        self.warmup_stable_start = now
+                    elif now - self.warmup_stable_start >= 5.0:
+                        logger.info("Warmup setpoints reached across all zones (tolerance ±5.0°C). Automatically transitioning to WORKING mode (State 2).")
+                        self.warmup_stable_start = None
+                        asyncio.create_task(self.set_state(2))
+                else:
+                    self.warmup_stable_start = None
+            else:
+                self.warmup_stable_start = None
 
             # Process alarm output & silence
             self.active_alarms = new_alarms
