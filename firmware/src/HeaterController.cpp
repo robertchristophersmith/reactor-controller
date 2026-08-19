@@ -97,12 +97,8 @@ void HeaterController::update(float tempPreheater, float tempLiquid, float tempG
       // Clear integral windup
       pid->SetMode(MANUAL);
       pid->SetMode(AUTOMATIC);
-    } else if (temp < sp - 20.0f) {
-      // WARM-UP BAND: Full 100% power for rapid warm-up without integral accumulation
-      outVal = (double)WINDOW_SIZE;
-      applyTimeProportional(pin, outVal);
     } else {
-      // PROPORTIONAL BAND: PID Control as temperature approaches setpoint
+      // Standard PID Control when below setpoint
       pid->Compute();
       applyTimeProportional(pin, outVal);
     }

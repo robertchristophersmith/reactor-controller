@@ -88,7 +88,7 @@ void SensorManager::begin() {
 void SensorManager::update() {
   _currentData.sensorStatus = 0;
 
-  // Helper with 3-read transient debouncer and exact error byte extraction
+  // Helper with 5-read transient debouncer and exact error byte extraction
   auto readTcDebounced = [&](Adafruit_MAX31855 *tc, const char *name, int idx, uint32_t errBit, uint8_t &exactErrOut) -> float {
     float t = tc->readCelsius();
     float internal = tc->readInternal();
@@ -110,11 +110,11 @@ void SensorManager::update() {
     exactErrOut = (err != 0) ? err : 0x08; // 0x08 = NaN / Comm Fault
     _lastExactErr[idx] = exactErrOut;
 
-    if (_errorCount[idx] < 3) {
-      // Transient error (1 or 2 reads): hold previous valid temp, do NOT set error bit yet
+    if (_errorCount[idx] < 6) {
+      // Transient error (1 to 5 reads): hold previous valid temp, do NOT set error bit yet
       return _lastValidTemp[idx];
     } else {
-      // Persistent error (3+ reads): set error bit and return previous valid temp for safe PID control
+      // Persistent error (6th+ read): set error bit and return previous valid temp for safe PID control
       _currentData.sensorStatus |= errBit;
       return _lastValidTemp[idx];
     }
