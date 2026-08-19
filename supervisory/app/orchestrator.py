@@ -645,23 +645,23 @@ class Orchestrator:
             delay = 60
             
             if avg_weight < w_min:
-                # Underflow
-                target_rpm = 350
+                # Underflow: 200% of user-configured speed
+                target_rpm = min(350, int(self.auto_rec_rpm * 2.0))
                 delay = 60
             elif avg_weight <= (w_min + (rng * 0.25)):
-                # Lower 25% Band
-                target_rpm = min(350, self.auto_rec_rpm * 2)
+                # Lower 25% Band: 150% of user-configured speed
+                target_rpm = min(350, int(self.auto_rec_rpm * 1.5))
                 delay = 300
             elif avg_weight <= (w_max - (rng * 0.25)):
-                # Middle 50% Band
+                # Middle 50% Band: 100% of user-configured speed
                 target_rpm = self.auto_rec_rpm
                 delay = 60
             elif avg_weight <= w_max:
-                # Upper 25% Band
+                # Upper 25% Band: 50% of user-configured speed
                 target_rpm = int(self.auto_rec_rpm * 0.5)
                 delay = 300
             else:
-                # Overflow
+                # Overflow: 0% of user-configured speed (Stopped)
                 run_motor = False
                 target_rpm = 0
                 delay = 300
