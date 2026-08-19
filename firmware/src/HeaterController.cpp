@@ -68,7 +68,7 @@ void HeaterController::setEnabled(bool enabled) {
   }
 }
 
-void HeaterController::update(float tempPreheater, float tempLiquid, float tempGas) {
+void HeaterController::update(float tempPreheater, float tempLiquid, float tempGas, float tempGasExt) {
   if (!_enabled) {
     digitalWrite(PIN_HEATER_FEEDSTOCK_PREHEATER, LOW);
     digitalWrite(PIN_HEATER_LIQUID_REACTOR, LOW);
@@ -110,7 +110,16 @@ void HeaterController::update(float tempPreheater, float tempLiquid, float tempG
 
   processZone(tempPreheater, _spPreheater, _pidPreheater, _outPreheater, PIN_HEATER_FEEDSTOCK_PREHEATER);
   processZone(tempLiquid, _spLiquid, _pidLiquid, _outLiquid, PIN_HEATER_LIQUID_REACTOR);
-  processZone(tempGas, _spGas, _pidGas, _outGas, PIN_HEATER_GAS_REACTOR);
+
+  // Gas Reactor External Over-temp Hard Safety Limit (110% of setpoint)
+  if (!isnan(tempGasExt) && _spGas > 0.0 && tempGasExt > (_spGas * 1.10f)) {
+    _outGas = 0.0;
+    digitalWrite(PIN_HEATER_GAS_REACTOR, LOW);
+    _pidGas->SetMode(MANUAL);
+    _pidGas->SetMode(AUTOMATIC);
+  } else {
+    processZone(tempGas, _spGas, _pidGas, _outGas, PIN_HEATER_GAS_REACTOR);
+  }
 }
 
 void HeaterController::applyTimeProportional(int pin, double output) {

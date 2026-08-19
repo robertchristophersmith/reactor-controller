@@ -14,7 +14,7 @@ public:
   void begin();
 
   void setSetpoints(float spPreheater, float spLiquid, float spGas);
-  void update(float tempPreheater, float tempLiquid, float tempGas);
+  void update(float tempPreheater, float tempLiquid, float tempGas, float tempGasExt = NAN);
   void setEnabled(bool enabled);
 
   // Telemetry getters

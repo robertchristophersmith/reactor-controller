@@ -121,8 +121,9 @@ void loop() {
       pvGas = instantGas;
     }
 
-    // D. Update Heaters (PID calculation)
-    heaters.update(data.tempFeedstockPreheater, data.tempLiquidReactor, pvGas);
+    // D. Update Heaters (PID calculation with external temp safety check)
+    heaters.update(data.tempFeedstockPreheater, data.tempLiquidReactor, pvGas,
+                   data.tempGasReactorExt);
 
     // E. Telemetry (1Hz)
     if (now - lastTelemetryTime >= 1000) {

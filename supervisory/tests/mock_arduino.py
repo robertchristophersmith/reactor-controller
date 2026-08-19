@@ -38,9 +38,12 @@ class MockReactor:
             self.heater_feed_pre = max(0, min(1000, (self.sp_feed_pre - self.temp_feed_pre) * 10))
             self.heater_liq_reac = max(0, min(1000, (self.sp_liq_reac - self.temp_liq_reac) * 15))
             
-            # Gas average control (70% int / 30% ext)
-            gas_weighted = self.temp_gas_reac_int * 0.7 + self.temp_gas_reac_ext * 0.3
-            self.heater_gas_reac = max(0, min(1000, (self.sp_gas_reac - gas_weighted) * 20))
+            # Gas average control (70% int / 30% ext) with 110% external temp hard cutoff
+            if self.sp_gas_reac > 0 and self.temp_gas_reac_ext > (self.sp_gas_reac * 1.10):
+                self.heater_gas_reac = 0
+            else:
+                gas_weighted = self.temp_gas_reac_int * 0.7 + self.temp_gas_reac_ext * 0.3
+                self.heater_gas_reac = max(0, min(1000, (self.sp_gas_reac - gas_weighted) * 20))
         else:
              self.heater_feed_pre = 0
              self.heater_liq_reac = 0
