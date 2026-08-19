@@ -73,7 +73,7 @@ async def calibrate_loadcell(value: float):
 
 @app.post("/api/control/pump/manual")
 async def pump_manual(state: str, dir: int, speed: int):
-    # state: "run" or "stop", dir: 0=CW, 1=CCW, speed: 0-99
+    # state: "run" or "stop", dir: 0=CW, 1=CCW, speed: 0-350 RPM
     await orchestrator.set_pump_manual(state, dir, speed)
     return {"status": "ok"}
 

@@ -601,11 +601,11 @@ class Orchestrator:
             
             if avg_weight < w_min:
                 # Underflow
-                target_rpm = 99
+                target_rpm = 350
                 delay = 60
             elif avg_weight <= (w_min + (rng * 0.25)):
                 # Lower 25% Band
-                target_rpm = min(99, self.auto_rec_rpm * 2)
+                target_rpm = min(350, self.auto_rec_rpm * 2)
                 delay = 300
             elif avg_weight <= (w_max - (rng * 0.25)):
                 # Middle 50% Band

@@ -29,6 +29,9 @@ class MotorController:
         
         self.override_callback = None
         self._lock = asyncio.Lock()
+        
+        # 1.8° step angle motor (200 full steps/rev) with driver DIP switches set to 1000 steps/rev
+        self.STEPS_PER_REV = 1000
 
     async def connect(self):
         try:
@@ -71,7 +74,9 @@ class MotorController:
                     self.physical_dir = 1
                 elif decoded.startswith("OK:SPEED_"):
                     try:
-                        self.physical_speed = int(decoded.split("_")[1])
+                        raw_steps_sec = int(decoded.split("_")[1])
+                        # Convert steps/sec back to RPM for UI telemetry
+                        self.physical_speed = int(round((raw_steps_sec * 60.0) / self.STEPS_PER_REV))
                     except Exception:
                         pass
             except Exception as e:
@@ -94,9 +99,11 @@ class MotorController:
         self.expected_dir = dir_val
         self.expected_speed = speed
         
-        # Phase 2 text protocol:
+        # Convert RPM to steps per second for AccelStepper driver
+        steps_per_sec = int(round((speed * self.STEPS_PER_REV) / 60.0))
+        
         if speed != self.physical_speed:
-            await self.send_command(f"<SPEED:{speed}>")
+            await self.send_command(f"<SPEED:{steps_per_sec}>")
             
         dir_str = "REV" if dir_val == 1 else "FWD"
         await self.send_command(f"<DIR:{dir_str}>")
