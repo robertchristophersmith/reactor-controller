@@ -34,6 +34,22 @@ def get_error_logs(db: Session, limit: int = 100):
         })
     return result
 
+def update_last_run_config(db: Session, sp: dict, pump: dict):
+    run_meta = db.query(RunsMetadata).order_by(RunsMetadata.id.desc()).first()
+    if run_meta:
+        if "feed_pre" in sp: run_meta.last_sp_feed_pre = float(sp.get("feed_pre") or 0.0)
+        if "liq_reac" in sp: run_meta.last_sp_liq_reac = float(sp.get("liq_reac") or 0.0)
+        if "gas_reac" in sp: run_meta.last_sp_gas_reac = float(sp.get("gas_reac") or 0.0)
+        
+        if "mode" in pump: run_meta.last_pump_mode = str(pump.get("mode") or "manual")
+        if "speed" in pump: run_meta.last_pump_speed = int(pump.get("speed") or 0)
+        if "dir" in pump: run_meta.last_pump_dir = int(pump.get("dir") or 0)
+        if "auto_min" in pump: run_meta.last_auto_min = float(pump.get("auto_min") or 0.0)
+        if "auto_max" in pump: run_meta.last_auto_max = float(pump.get("auto_max") or 0.0)
+        if "auto_rec_rpm" in pump: run_meta.last_auto_rec_rpm = int(pump.get("auto_rec_rpm") or 0)
+        if "auto_dir" in pump: run_meta.last_auto_dir = int(pump.get("auto_dir") or 0)
+        db.commit()
+
 def create_log(db: Session, data: dict, uptime: float, state: int):
     # Map dictionary keys (from JSON) to Model fields
     # JSON keys: t_gas, t_feed... -> Model: temp_gas, temp_feed...
@@ -68,6 +84,7 @@ def create_log(db: Session, data: dict, uptime: float, state: int):
         pump_speed=pump.get("speed", 0)
     )
     db.add(db_log)
+    update_last_run_config(db, sp, pump)
     db.commit()
     return db_log
 

@@ -586,6 +586,49 @@ class Orchestrator:
             if zone in self.ramps: del self.ramps[zone]
             await self.send_command_setpoint(zone, value)
 
+    async def restore_last_configuration(self):
+        try:
+            with SessionLocal() as db:
+                from .database import RunsMetadata, Logs1s
+                meta = db.query(RunsMetadata).order_by(RunsMetadata.id.desc()).first()
+                last_log = db.query(Logs1s).order_by(Logs1s.id.desc()).first()
+                
+                sp_pre = meta.last_sp_feed_pre if (meta and meta.last_sp_feed_pre) else (last_log.sp_feed_pre if last_log else 0.0)
+                sp_liq = meta.last_sp_liq_reac if (meta and meta.last_sp_liq_reac) else (last_log.sp_liq_reac if last_log else 0.0)
+                sp_gas = meta.last_sp_gas_reac if (meta and meta.last_sp_gas_reac) else (last_log.sp_gas_reac if last_log else 0.0)
+                
+                mode = meta.last_pump_mode if meta else "manual"
+                speed = meta.last_pump_speed if meta else (last_log.pump_speed if last_log else 0)
+                p_dir = meta.last_pump_dir if meta else 0
+                auto_min = meta.last_auto_min if meta else 0.0
+                auto_max = meta.last_auto_max if meta else 0.0
+                auto_rec_rpm = meta.last_auto_rec_rpm if meta else 0
+                auto_dir = meta.last_auto_dir if meta else 0
+                
+                # Restore Setpoints to hardware
+                await self.send_command_setpoint(0, sp_pre)
+                await self.send_command_setpoint(1, sp_liq)
+                await self.send_command_setpoint(2, sp_gas)
+                
+                # Restore Pump Settings
+                if mode == "auto":
+                    self.set_pump_auto(auto_min, auto_max, auto_rec_rpm, auto_dir)
+                else:
+                    await self.set_pump_manual("stop", p_dir, speed)
+                    
+                logger.info(f"Restored last configuration: Setpoints=[{sp_pre}, {sp_liq}, {sp_gas}], PumpMode={mode}, Speed={speed}")
+                return {
+                    "sp": {"feed_pre": sp_pre, "liq_reac": sp_liq, "gas_reac": sp_gas},
+                    "pump": {
+                        "mode": mode, "speed": speed, "dir": p_dir,
+                        "auto_min": auto_min, "auto_max": auto_max,
+                        "auto_rec_rpm": auto_rec_rpm, "auto_dir": auto_dir
+                    }
+                }
+        except Exception as e:
+            logger.error(f"Error restoring last configuration: {e}")
+            return None
+
     async def set_state(self, state: int):
         await serial_link.send_command({"cmd": "SET_STATE", "state": state})
 

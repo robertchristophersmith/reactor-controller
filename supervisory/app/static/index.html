@@ -366,6 +366,7 @@
                                 <Line yAxisId="right" type="monotone" dataKey="sensors.t_liq_reac" stroke="#EF4444" dot={false} name="Liq Reac (°C)" />
                                 <Line yAxisId="right" type="monotone" dataKey="sensors.t_gas_reac_int" stroke="#A78BFA" dot={false} name="Gas Int (°C)" />
                                 <Line yAxisId="right" type="monotone" dataKey="sensors.t_gas_reac_ext" stroke="#6366F1" dot={false} name="Gas Ext (°C)" />
+                            </LineChart>
                         </ResponsiveContainer>
                     </div>
 
@@ -601,7 +602,12 @@
             const [step, setStep] = useState(status.has_data ? "DETECTED" : "NEW_NAME");
             const [runName, setRunName] = useState("");
 
-            const handleResume = () => {
+            const handleResume = async () => {
+                try {
+                    await fetch('/api/run/resume', { method: 'POST' });
+                } catch (e) {
+                    console.error("Error resuming run configuration", e);
+                }
                 onComplete();
             };
 
@@ -739,6 +745,12 @@
         function ZoneCard({ title, temp, sub, sp, out, onSetSp, connected, errorMsg }) {
             const [val, setVal] = useState(sp);
             const [rate, setRate] = useState(0);
+
+            React.useEffect(() => {
+                if (sp !== undefined && sp !== null) {
+                    setVal(sp);
+                }
+            }, [sp]);
 
             const isDisconnected = connected === false;
             const hasError = Boolean(errorMsg);
@@ -898,13 +910,16 @@
             const [localSpeed, setLocalSpeed] = useState(0);
             const [localDir, setLocalDir] = useState(0);
 
-            // Sync with telemetry if not being edited (simple approach)
+            // Sync with telemetry if updated / restored
             React.useEffect(() => {
-                if(pump) {
-                    setLocalMin(pump.auto_min);
-                    setLocalMax(pump.auto_max);
+                if (pump) {
+                    if (pump.auto_min !== undefined) setLocalMin(pump.auto_min);
+                    if (pump.auto_max !== undefined) setLocalMax(pump.auto_max);
+                    if (pump.auto_rec_rpm !== undefined && pump.mode === 'auto') setLocalSpeed(pump.auto_rec_rpm);
+                    else if (pump.speed !== undefined) setLocalSpeed(pump.speed);
+                    if (pump.dir !== undefined) setLocalDir(pump.dir);
                 }
-            }, [pump?.auto_min, pump?.auto_max]);
+            }, [pump?.auto_min, pump?.auto_max, pump?.auto_rec_rpm, pump?.speed, pump?.dir, pump?.mode]);
 
             const isAuto = pump?.mode === 'auto';
             const isDisconnected = pump?.connected === false;

@@ -29,6 +29,19 @@ class RunsMetadata(Base):
     run_name: Mapped[str] = mapped_column(unique=True)
     start_time: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     status: Mapped[str] = mapped_column(default="active")
+    
+    # Last Known Configuration (for resuming after power cycle / restart)
+    last_sp_feed_pre: Mapped[float] = mapped_column(default=0.0)
+    last_sp_liq_reac: Mapped[float] = mapped_column(default=0.0)
+    last_sp_gas_reac: Mapped[float] = mapped_column(default=0.0)
+    
+    last_pump_mode: Mapped[str] = mapped_column(default="manual")
+    last_pump_speed: Mapped[int] = mapped_column(default=0)
+    last_pump_dir: Mapped[int] = mapped_column(default=0)
+    last_auto_min: Mapped[float] = mapped_column(default=0.0)
+    last_auto_max: Mapped[float] = mapped_column(default=0.0)
+    last_auto_rec_rpm: Mapped[int] = mapped_column(default=0)
+    last_auto_dir: Mapped[int] = mapped_column(default=0)
 
 class LogMixin:
     # A mixin to share columns between 1s, 1m, and 10m tables
@@ -76,6 +89,28 @@ class Logs10m(Base, LogMixin):
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    with engine.connect() as conn:
+        try:
+            res = conn.execute(text("PRAGMA table_info(runs_metadata)"))
+            existing_cols = {row[1] for row in res.fetchall()}
+            new_cols = {
+                "last_sp_feed_pre": "REAL DEFAULT 0.0",
+                "last_sp_liq_reac": "REAL DEFAULT 0.0",
+                "last_sp_gas_reac": "REAL DEFAULT 0.0",
+                "last_pump_mode": "TEXT DEFAULT 'manual'",
+                "last_pump_speed": "INTEGER DEFAULT 0",
+                "last_pump_dir": "INTEGER DEFAULT 0",
+                "last_auto_min": "REAL DEFAULT 0.0",
+                "last_auto_max": "REAL DEFAULT 0.0",
+                "last_auto_rec_rpm": "INTEGER DEFAULT 0",
+                "last_auto_dir": "INTEGER DEFAULT 0",
+            }
+            for col_name, col_type in new_cols.items():
+                if col_name not in existing_cols:
+                    conn.execute(text(f"ALTER TABLE runs_metadata ADD COLUMN {col_name} {col_type}"))
+            conn.commit()
+        except Exception:
+            pass
 
 def get_db():
     db = SessionLocal()

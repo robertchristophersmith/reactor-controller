@@ -9,6 +9,8 @@ services:
       - "8000:8000"
     environment:
       - APP_ENV=development
+    volumes:
+      - ./reactor_logs.db:/app/reactor_logs.db
     depends_on:
       - sensor_emulator
       - pump_emulator

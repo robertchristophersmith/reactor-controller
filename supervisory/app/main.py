@@ -99,22 +99,48 @@ async def get_run_status(db: Session = Depends(get_db)):
     run_meta = db.query(RunsMetadata).order_by(RunsMetadata.id.desc()).first()
     has_data = db.query(Logs1s.id).first() is not None
     
+    last_config = None
+    if run_meta:
+        last_config = {
+            "sp": {
+                "feed_pre": run_meta.last_sp_feed_pre,
+                "liq_reac": run_meta.last_sp_liq_reac,
+                "gas_reac": run_meta.last_sp_gas_reac
+            },
+            "pump": {
+                "mode": run_meta.last_pump_mode,
+                "speed": run_meta.last_pump_speed,
+                "dir": run_meta.last_pump_dir,
+                "auto_min": run_meta.last_auto_min,
+                "auto_max": run_meta.last_auto_max,
+                "auto_rec_rpm": run_meta.last_auto_rec_rpm,
+                "auto_dir": run_meta.last_auto_dir
+            }
+        }
+    
     return {
         "has_data": has_data,
         "current_run_name": run_meta.run_name if run_meta else None,
-        "status": run_meta.status if run_meta else None
+        "status": run_meta.status if run_meta else None,
+        "last_config": last_config
     }
+
+@app.post("/api/run/resume")
+async def resume_run():
+    restored = await orchestrator.restore_last_configuration()
+    return {"status": "ok", "restored": restored}
 
 @app.post("/api/run/new")
 async def start_new_run(run_name: str, db: Session = Depends(get_db)):
-    # Clear all data
+    # Clear all previous run logs & metadata
     db.query(Logs1s).delete()
     db.query(Logs1m).delete()
     db.query(Logs10m).delete()
     db.query(ErrorLog).delete()
     db.query(RunsMetadata).delete()
+    db.commit()
     
-    # Create new run
+    # Create new active run
     new_run = RunsMetadata(run_name=run_name, status="active")
     db.add(new_run)
     db.commit()
