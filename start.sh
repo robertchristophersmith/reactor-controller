@@ -28,7 +28,7 @@ sleep 1
 
 # Launch Chromium browser in full-screen kiosk mode with virtual touch keyboard enabled
 echo "Launching browser..."
-CHROMIUM_FLAGS="--password-store=basic --enable-virtual-keyboard --ui-enable-virtual-keyboard --disable-usb-keyboard-detect --touch-events=enabled --kiosk"
+CHROMIUM_FLAGS="--password-store=basic --enable-virtual-keyboard --ui-enable-virtual-keyboard --disable-usb-keyboard-detect --touch-events=enabled --disable-session-crashed-bubble --disable-infobars --no-errordocs --no-first-run --autoplay-policy=no-user-gesture-required --kiosk"
 if command -v chromium-browser &> /dev/null; then
     nohup chromium-browser $CHROMIUM_FLAGS http://localhost:8000/ > /dev/null 2>&1 &
 elif command -v chromium &> /dev/null; then
