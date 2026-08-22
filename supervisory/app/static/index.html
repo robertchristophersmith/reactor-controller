@@ -10,7 +10,10 @@
     <script src="/vendor/react-dom.min.js"></script>
     <script src="/vendor/prop-types.min.js"></script>
     <script src="/vendor/babel.min.js"></script>
-    <script src="/vendor/recharts.min.js"></script>
+    <script src="/vendor/chart.umd.js"></script>
+    <script src="/vendor/luxon.min.js"></script>
+    <script src="/vendor/chartjs-adapter-luxon.min.js"></script>
+    <script src="/vendor/chartjs-plugin-streaming.min.js"></script>
 </head>
 
 <body class="bg-gray-900 text-white font-sans">
@@ -18,7 +21,6 @@
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
-        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = Recharts;
 
         const ERR_TC_GAS_INTERNAL = (1 << 0);
         const ERR_TC_FEEDSTOCK = (1 << 1);
@@ -337,37 +339,8 @@
                             errorMsg={parseExactError(errMask, (1<<3)|(1<<4), s.tc_errors?.t_gas_reac_int || s.tc_errors?.t_gas_reac_ext)} />
                     </div>
 
-                    {/* Chart */}
-                    <div className="flex-1 bg-gray-800 p-4 rounded-lg min-h-[400px] border border-gray-700 shadow-inner flex flex-col">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-lg font-bold text-gray-300">Historical Data</h2>
-                            <select className="bg-gray-700 text-white border border-gray-600 rounded px-2 py-1 text-sm outline-none"
-                                value={timeRange} onChange={(e) => setTimeRange(parseFloat(e.target.value))}>
-                                <option value={0.5}>Last 30 Minutes</option>
-                                <option value={1}>Last 1 Hour</option>
-                                <option value={6}>Last 6 Hours</option>
-                                <option value={24}>Last 24 Hours</option>
-                                <option value={72}>Last 72 Hours</option>
-                            </select>
-                        </div>
-                        <ResponsiveContainer width="100%" height={400}>
-                            <LineChart data={data}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                                <XAxis dataKey="ts" stroke="#9CA3AF" />
-                                <YAxis yAxisId="left" stroke="#9CA3AF" />
-                                <YAxis yAxisId="right" orientation="right" stroke="#818CF8" />
-                                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #4B5563', borderRadius: '0.5rem' }} />
-                                <Legend />
-                                <Line yAxisId="left" type="monotone" dataKey="sensors.weight" stroke="#14B8A6" dot={false} name="Weight (Kg)" />
-                                <Line yAxisId="right" type="stepAfter" dataKey="pump.speed" stroke="#818CF8" dot={false} name="Pump Speed" />
-                                <Line yAxisId="right" type="monotone" dataKey="sensors.t_feed_res" stroke="#2DD4BF" dot={false} name="Feed Res (°C)" />
-                                <Line yAxisId="right" type="monotone" dataKey="sensors.t_feed_pre" stroke="#FBBF24" dot={false} name="Feed Pre (°C)" />
-                                <Line yAxisId="right" type="monotone" dataKey="sensors.t_liq_reac" stroke="#EF4444" dot={false} name="Liq Reac (°C)" />
-                                <Line yAxisId="right" type="monotone" dataKey="sensors.t_gas_reac_int" stroke="#A78BFA" dot={false} name="Gas Int (°C)" />
-                                <Line yAxisId="right" type="monotone" dataKey="sensors.t_gas_reac_ext" stroke="#6366F1" dot={false} name="Gas Ext (°C)" />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
+                    {/* Chart.js Real-time Streaming & Historical Chart */}
+                    <TelemetryChart data={data} latest={latest} timeRange={timeRange} setTimeRange={setTimeRange} />
 
                     {/* Floating Active Alarm Panel (Non-modal) */}
                     {alarms.active && alarms.active.length > 0 && !alarmDismissed && (
@@ -478,6 +451,235 @@
                             </div>
                         </div>
                     )}
+                </div>
+            );
+        }
+
+        function TelemetryChart({ data, latest, timeRange, setTimeRange }) {
+            const canvasRef = useRef(null);
+            const chartInstanceRef = useRef(null);
+            const latestRef = useRef(latest);
+
+            useEffect(() => {
+                latestRef.current = latest;
+            }, [latest]);
+
+            useEffect(() => {
+                if (!canvasRef.current) return;
+                const ctx = canvasRef.current.getContext('2d');
+
+                const datasets = [
+                    {
+                        label: 'Weight (Kg)',
+                        yAxisID: 'yWeight',
+                        borderColor: '#14B8A6',
+                        backgroundColor: '#14B8A6',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        data: []
+                    },
+                    {
+                        label: 'Pump Speed',
+                        yAxisID: 'yTemp',
+                        borderColor: '#818CF8',
+                        backgroundColor: '#818CF8',
+                        borderWidth: 2,
+                        stepped: 'after',
+                        pointRadius: 0,
+                        data: []
+                    },
+                    {
+                        label: 'Feed Res (°C)',
+                        yAxisID: 'yTemp',
+                        borderColor: '#2DD4BF',
+                        backgroundColor: '#2DD4BF',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        data: []
+                    },
+                    {
+                        label: 'Feed Pre (°C)',
+                        yAxisID: 'yTemp',
+                        borderColor: '#FBBF24',
+                        backgroundColor: '#FBBF24',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        data: []
+                    },
+                    {
+                        label: 'Liq Reac (°C)',
+                        yAxisID: 'yTemp',
+                        borderColor: '#EF4444',
+                        backgroundColor: '#EF4444',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        data: []
+                    },
+                    {
+                        label: 'Gas Int (°C)',
+                        yAxisID: 'yTemp',
+                        borderColor: '#A78BFA',
+                        backgroundColor: '#A78BFA',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        data: []
+                    },
+                    {
+                        label: 'Gas Ext (°C)',
+                        yAxisID: 'yTemp',
+                        borderColor: '#6366F1',
+                        backgroundColor: '#6366F1',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        data: []
+                    }
+                ];
+
+                const config = {
+                    type: 'line',
+                    data: { datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: false,
+                        interaction: {
+                            intersect: false,
+                            mode: 'nearest'
+                        },
+                        plugins: {
+                            legend: {
+                                labels: {
+                                    color: '#9CA3AF',
+                                    font: { size: 12 }
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: '#1F2937',
+                                titleColor: '#F3F4F6',
+                                bodyColor: '#F3F4F6',
+                                borderColor: '#4B5563',
+                                borderWidth: 1
+                            }
+                        },
+                        scales: {
+                            x: {
+                                type: 'realtime',
+                                realtime: {
+                                    duration: timeRange * 3600 * 1000,
+                                    refresh: 1000,
+                                    delay: 1000,
+                                    onRefresh: (chart) => {
+                                        const l = latestRef.current;
+                                        if (!l) return;
+                                        const now = Date.now();
+                                        const s = l.sensors || {};
+                                        const p = l.pump || {};
+
+                                        chart.data.datasets[0].data.push({ x: now, y: s.weight ?? null });
+                                        chart.data.datasets[1].data.push({ x: now, y: p.speed ?? null });
+                                        chart.data.datasets[2].data.push({ x: now, y: s.t_feed_res ?? null });
+                                        chart.data.datasets[3].data.push({ x: now, y: s.t_feed_pre ?? null });
+                                        chart.data.datasets[4].data.push({ x: now, y: s.t_liq_reac ?? null });
+                                        chart.data.datasets[5].data.push({ x: now, y: s.t_gas_reac_int ?? null });
+                                        chart.data.datasets[6].data.push({ x: now, y: s.t_gas_reac_ext ?? null });
+                                    }
+                                },
+                                ticks: { color: '#9CA3AF' },
+                                grid: { color: '#374151' }
+                            },
+                            yWeight: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                title: { display: true, text: 'Weight (Kg)', color: '#14B8A6' },
+                                ticks: { color: '#9CA3AF' },
+                                grid: { color: '#374151' }
+                            },
+                            yTemp: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                title: { display: true, text: 'Temp (°C) / RPM', color: '#818CF8' },
+                                ticks: { color: '#9CA3AF' },
+                                grid: { drawOnChartArea: false }
+                            }
+                        }
+                    }
+                };
+
+                const chartInstance = new Chart(ctx, config);
+                chartInstanceRef.current = chartInstance;
+
+                return () => {
+                    chartInstance.destroy();
+                    chartInstanceRef.current = null;
+                };
+            }, []);
+
+            useEffect(() => {
+                const chart = chartInstanceRef.current;
+                if (!chart) return;
+
+                chart.options.scales.x.realtime.duration = timeRange * 3600 * 1000;
+
+                if (Array.isArray(data) && data.length > 0) {
+                    const weightPts = [];
+                    const speedPts = [];
+                    const feedResPts = [];
+                    const feedPrePts = [];
+                    const liqReacPts = [];
+                    const gasIntPts = [];
+                    const gasExtPts = [];
+
+                    data.forEach(item => {
+                        const s = item.sensors || {};
+                        const p = item.pump || {};
+                        let tVal = item.ts;
+                        if (typeof tVal === 'string') {
+                            const today = new Date().toISOString().split('T')[0];
+                            tVal = new Date(`${today}T${tVal}`).getTime();
+                        } else if (!tVal) {
+                            tVal = Date.now();
+                        }
+
+                        if (s.weight != null) weightPts.push({ x: tVal, y: s.weight });
+                        if (p.speed != null) speedPts.push({ x: tVal, y: p.speed });
+                        if (s.t_feed_res != null) feedResPts.push({ x: tVal, y: s.t_feed_res });
+                        if (s.t_feed_pre != null) feedPrePts.push({ x: tVal, y: s.t_feed_pre });
+                        if (s.t_liq_reac != null) liqReacPts.push({ x: tVal, y: s.t_liq_reac });
+                        if (s.t_gas_reac_int != null) gasIntPts.push({ x: tVal, y: s.t_gas_reac_int });
+                        if (s.t_gas_reac_ext != null) gasExtPts.push({ x: tVal, y: s.t_gas_reac_ext });
+                    });
+
+                    chart.data.datasets[0].data = weightPts;
+                    chart.data.datasets[1].data = speedPts;
+                    chart.data.datasets[2].data = feedResPts;
+                    chart.data.datasets[3].data = feedPrePts;
+                    chart.data.datasets[4].data = liqReacPts;
+                    chart.data.datasets[5].data = gasIntPts;
+                    chart.data.datasets[6].data = gasExtPts;
+                }
+
+                chart.update('quiet');
+            }, [data, timeRange]);
+
+            return (
+                <div className="flex-1 bg-gray-800 p-4 rounded-lg min-h-[400px] border border-gray-700 shadow-inner flex flex-col">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-lg font-bold text-gray-300">Live Telemetry & Historical Chart (Chart.js Streaming)</h2>
+                        <select className="bg-gray-700 text-white border border-gray-600 rounded px-2 py-1 text-sm outline-none"
+                            value={timeRange} onChange={(e) => setTimeRange(parseFloat(e.target.value))}>
+                            <option value={0.083}>Last 5 Minutes</option>
+                            <option value={0.5}>Last 30 Minutes</option>
+                            <option value={1}>Last 1 Hour</option>
+                            <option value={6}>Last 6 Hours</option>
+                            <option value={24}>Last 24 Hours</option>
+                            <option value={72}>Last 72 Hours</option>
+                        </select>
+                    </div>
+                    <div className="relative flex-1 min-h-[350px]">
+                        <canvas ref={canvasRef}></canvas>
+                    </div>
                 </div>
             );
         }
