@@ -145,6 +145,13 @@
                 timeRangeRef.current = timeRange;
             }, [timeRange]);
 
+            useEffect(() => {
+                fetch('/api/run/status')
+                    .then(r => r.json())
+                    .then(s => setRunStatus(s))
+                    .catch(e => console.error(e));
+            }, []);
+
             const fetchHistory = useCallback(async (targetTimeRange = timeRangeRef.current) => {
                 if (!sessionReady) return;
                 setIsRefreshing(true);
