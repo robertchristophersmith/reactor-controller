@@ -37,13 +37,17 @@
         const STATE_LABELS = {
             0: "STANDBY",
             1: "WARMUP",
-            2: "WORKING"
+            2: "WORKING",
+            3: "ALARM",
+            4: "FAULT"
         };
 
         const STATE_COLORS = {
             0: "text-gray-400 border border-gray-600",
             1: "text-yellow-400 border border-yellow-600",
-            2: "text-green-400 border border-green-600"
+            2: "text-green-400 border border-green-600",
+            3: "text-orange-400 border border-orange-600",
+            4: "text-red-400 border border-red-600"
         };
 
         class WebBuzzer {
@@ -281,6 +285,20 @@
                             <div className="text-sm text-gray-400 font-mono">uptime: {l.uptime ?? 0}s</div>
                         </div>
                     </header>
+
+                    {/* Active Alarm Alert Banner */}
+                    {l.alarms && l.alarms.active && l.alarms.active.length > 0 && (
+                        <div className="bg-red-900/80 border border-red-500 text-red-200 px-4 py-3 rounded-lg shadow-lg mb-2">
+                            <div className="font-bold flex items-center gap-2">
+                                <span>⚠️ ACTIVE ALARM / WARNING:</span>
+                            </div>
+                            <ul className="list-disc list-inside text-sm mt-1 space-y-1">
+                                {l.alarms.active.map((alm, idx) => (
+                                    <li key={idx}><span className="font-semibold">{alm.name || alm.code}:</span> {alm.desc}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
 
                     {/* Alarm Settings Modal */}
                     {showAlarmConfig && <AlarmConfigModal onClose={() => setShowAlarmConfig(false)} />}

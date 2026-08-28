@@ -140,8 +140,8 @@ void checkSafety(SensorData &data) {
       (!isnan(data.tempGasReactorInt) && data.tempGasReactorInt > MAX_TEMP_C_GAS_REACTOR) ||
       (!isnan(data.tempGasReactorExt) && data.tempGasReactorExt > MAX_TEMP_C_GAS_REACTOR) ||
       (!isnan(data.tempElectronicsHousing) && data.tempElectronicsHousing > MAX_TEMP_C_HOUSING)) {
-    if (currentState != STATE_FAULT) {
-      currentState = STATE_FAULT;
+    if (currentState != STATE_STANDBY) {
+      currentState = STATE_STANDBY;
       comms.sendError("THERMAL_SAFETY_LIMIT_EXCEEDED");
     }
   }

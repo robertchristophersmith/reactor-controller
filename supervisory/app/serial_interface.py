@@ -64,6 +64,8 @@ class SerialInterface:
                     elif "error" in data:
                         print(f"FIRMWARE ERROR: {data['error']}")
                         logger.error(f"FIRMWARE ERROR: {data['error']}")
+                        if self.telemetry_callback:
+                            await self.telemetry_callback({"fw_error": data["error"]})
                 except json.JSONDecodeError:
                     print(f"Malformed JSON: {decoded}")
                     logger.warning(f"Malformed JSON: {line}")

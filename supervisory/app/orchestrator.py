@@ -333,6 +333,38 @@ class Orchestrator:
                 # In Standby, Warmup, Shutdown: clear offline grace timers
                 self.tc_offline_start = {}
 
+            # Process Firmware Error Messages
+            fw_err = data.get("fw_error")
+            if fw_err:
+                new_alarms.append({
+                    "code": "ERR_FIRMWARE_SAFETY",
+                    "name": "Firmware Safety Trip",
+                    "desc": f"Hardware safety limit triggered: {fw_err}"
+                })
+
+            # Check for valid reasons for halting heating vs. auto-recovery to Warmup
+            has_valid_halt_reason = False
+            halt_reason_desc = ""
+            if fw_err:
+                has_valid_halt_reason = True
+                halt_reason_desc = f"Firmware error: {fw_err}"
+
+            for alarm in new_alarms:
+                code = alarm.get("code", "")
+                if code.startswith("ERR_TC_FAULT") or code.startswith("ERR_TEMP_HIGH") or code == "ERR_FIRMWARE_SAFETY":
+                    has_valid_halt_reason = True
+                    halt_reason_desc = alarm.get("desc", "Critical safety alarm")
+                    break
+
+            if has_valid_halt_reason:
+                if current_state != 0:
+                    logger.warning(f"Valid reason for halting heating triggered: {halt_reason_desc}. Setting system to STANDBY (State 0).")
+                    asyncio.create_task(self.set_state(0))
+            elif current_state not in [0, 1, 2]:
+                # System in unknown/invalid state due to error: put into WARMUP automatically
+                logger.warning(f"System found in unknown state ({current_state}) without a valid halt reason. Automatically placing system into WARMUP mode (State 1).")
+                asyncio.create_task(self.set_state(1))
+
             # Automatic transition check from WARMUP (State 1) -> WORKING (State 2)
             if current_state == 1:
                 sp_map = data.get("sp", {})
