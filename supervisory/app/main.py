@@ -83,7 +83,7 @@ async def pump_auto(min_w: float, max_w: float, rec_rpm: int, dir: int = 0):
     return {"status": "ok"}
 
 @app.get("/api/history")
-async def get_history(hours: float = 0.5, db: Session = Depends(get_db)):
+async def get_history(hours: float = 0.083, db: Session = Depends(get_db)):
     if hours <= 0:
         return list(orchestrator.live_buffer)
     return get_history_downsampled(db, hours)

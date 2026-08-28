@@ -88,13 +88,16 @@ def create_log(db: Session, data: dict, uptime: float, state: int):
     db.commit()
     return db_log
 
-def get_history_downsampled(db: Session, hours: int, max_points: int = 300):
+def get_history_downsampled(db: Session, hours: float, max_points: int = 300):
     cutoff = datetime.utcnow() - timedelta(hours=hours)
     
-    # Decide which table to query based on time horizon
-    if hours <= 1:
+    # Select database table based on time horizon
+    # - 1s raw logs for periods up to 1 hour (e.g. 5m, 30m, 1h)
+    # - 1m rollups for periods up to 6 hours (e.g. 6h)
+    # - 10m rollups for long periods (e.g. 24h, 72h)
+    if hours <= 1.0:
         Table = Logs1s
-    elif hours <= 6:
+    elif hours <= 6.0:
         Table = Logs1m
     else:
         Table = Logs10m
@@ -103,14 +106,14 @@ def get_history_downsampled(db: Session, hours: int, max_points: int = 300):
     if not logs:
         return []
         
-    # We still decimate if somehow there are more than max_points, but ideally the rollups handle it
+    # Decimate if points exceed max_points
     step = max(1, len(logs) // max_points)
     sampled = logs[::step]
     
     result = []
     for log in sampled:
         result.append({
-            "ts": log.timestamp.strftime("%H:%M:%S"),
+            "ts": log.timestamp.isoformat(),
             "uptime": log.uptime,
             "state": log.control_state,
             "sensors": {

@@ -130,7 +130,8 @@
             const [data, setData] = useState([]);
             const [latest, setLatest] = useState(null);
             const [status, setStatus] = useState("DISCONNECTED");
-            const [timeRange, setTimeRange] = useState(0.5);
+            const [timeRange, setTimeRange] = useState(0.083);
+            const [isRefreshing, setIsRefreshing] = useState(false);
             const [runStatus, setRunStatus] = useState(null);
             const [sessionReady, setSessionReady] = useState(false);
             const [showAlarmConfig, setShowAlarmConfig] = useState(false);
@@ -138,27 +139,30 @@
             const [alarmDismissed, setAlarmDismissed] = useState(false);
             const [audioMuted, setAudioMuted] = useState(false);
             const prevAlarmCodesRef = useRef("");
+            const timeRangeRef = useRef(timeRange);
 
             useEffect(() => {
-                fetch('/api/run/status')
-                    .then(r => r.json())
-                    .then(s => setRunStatus(s))
-                    .catch(e => console.error(e));
-            }, []);
+                timeRangeRef.current = timeRange;
+            }, [timeRange]);
+
+            const fetchHistory = useCallback(async (targetTimeRange = timeRangeRef.current) => {
+                if (!sessionReady) return;
+                setIsRefreshing(true);
+                try {
+                    const res = await fetch(`/api/history?hours=${targetTimeRange}`);
+                    const hist = await res.json();
+                    setData(hist);
+                } catch (e) {
+                    console.error("Failed to fetch history", e);
+                } finally {
+                    setIsRefreshing(false);
+                }
+            }, [sessionReady]);
 
             useEffect(() => {
                 if (!sessionReady) return;
-                const fetchHistory = async () => {
-                    try {
-                        const res = await fetch(`/api/history?hours=${timeRange}`);
-                        const hist = await res.json();
-                        setData(hist);
-                    } catch (e) {
-                        console.error("Failed to fetch history", e);
-                    }
-                };
-                fetchHistory();
-            }, [timeRange, sessionReady]);
+                fetchHistory(timeRange);
+            }, [timeRange, sessionReady, fetchHistory]);
 
             useEffect(() => {
                 if (!sessionReady) return;
@@ -176,14 +180,17 @@
                             return;
                         }
                         
-                        msg.ts = new Date().toLocaleTimeString();
+                        msg.ts = new Date().toISOString();
 
                         setLatest(msg);
-                        setData(prev => {
-                            const next = [...prev, msg];
-                            if (next.length > 400) next.shift();
-                            return next;
-                        });
+                        // Only append to data state when in 5-minute live mode
+                        if (timeRangeRef.current === 0.083) {
+                            setData(prev => {
+                                const next = [...prev, msg];
+                                if (next.length > 400) next.shift();
+                                return next;
+                            });
+                        }
                     } catch (err) {
                         console.error("Failed to parse WebSocket telemetry packet", err);
                     }
@@ -358,7 +365,7 @@
                     </div>
 
                     {/* Chart.js Real-time Streaming & Historical Chart */}
-                    <TelemetryChart data={data} latest={latest} timeRange={timeRange} setTimeRange={setTimeRange} />
+                    <TelemetryChart data={data} latest={latest} timeRange={timeRange} setTimeRange={setTimeRange} onRefresh={() => fetchHistory(timeRange)} isRefreshing={isRefreshing} />
 
                     {/* Floating Active Alarm Panel (Non-modal) */}
                     {alarms.active && alarms.active.length > 0 && !alarmDismissed && (
@@ -473,14 +480,20 @@
             );
         }
 
-        function TelemetryChart({ data, latest, timeRange, setTimeRange }) {
+        function TelemetryChart({ data, latest, timeRange, setTimeRange, onRefresh, isRefreshing }) {
             const canvasRef = useRef(null);
             const chartInstanceRef = useRef(null);
             const latestRef = useRef(latest);
+            const isLive = timeRange === 0.083;
+            const isLiveRef = useRef(isLive);
 
             useEffect(() => {
                 latestRef.current = latest;
             }, [latest]);
+
+            useEffect(() => {
+                isLiveRef.current = isLive;
+            }, [isLive]);
 
             useEffect(() => {
                 if (!canvasRef.current) return;
@@ -586,7 +599,9 @@
                                     duration: timeRange * 3600 * 1000,
                                     refresh: 1000,
                                     delay: 1000,
+                                    pause: !isLiveRef.current,
                                     onRefresh: (chart) => {
+                                        if (!isLiveRef.current) return;
                                         const l = latestRef.current;
                                         if (!l) return;
                                         const now = Date.now();
@@ -639,8 +654,9 @@
                 if (!chart) return;
 
                 chart.options.scales.x.realtime.duration = timeRange * 3600 * 1000;
+                chart.options.scales.x.realtime.pause = !isLive;
 
-                if (Array.isArray(data) && data.length > 0) {
+                if (Array.isArray(data)) {
                     const weightPts = [];
                     const speedPts = [];
                     const feedResPts = [];
@@ -654,8 +670,12 @@
                         const p = item.pump || {};
                         let tVal = item.ts;
                         if (typeof tVal === 'string') {
-                            const today = new Date().toISOString().split('T')[0];
-                            tVal = new Date(`${today}T${tVal}`).getTime();
+                            if (tVal.includes('T')) {
+                                tVal = new Date(tVal).getTime();
+                            } else {
+                                const today = new Date().toISOString().split('T')[0];
+                                tVal = new Date(`${today}T${tVal}`).getTime();
+                            }
                         } else if (!tVal) {
                             tVal = Date.now();
                         }
@@ -679,21 +699,41 @@
                 }
 
                 chart.update('quiet');
-            }, [data, timeRange]);
+            }, [data, timeRange, isLive]);
 
             return (
                 <div className="flex-1 bg-gray-800 p-4 rounded-lg min-h-[400px] border border-gray-700 shadow-inner flex flex-col">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-lg font-bold text-gray-300">Live Telemetry & Historical Chart (Chart.js Streaming)</h2>
-                        <select className="bg-gray-700 text-white border border-gray-600 rounded px-2 py-1 text-sm outline-none"
-                            value={timeRange} onChange={(e) => setTimeRange(parseFloat(e.target.value))}>
-                            <option value={0.083}>Last 5 Minutes</option>
-                            <option value={0.5}>Last 30 Minutes</option>
-                            <option value={1}>Last 1 Hour</option>
-                            <option value={6}>Last 6 Hours</option>
-                            <option value={24}>Last 24 Hours</option>
-                            <option value={72}>Last 72 Hours</option>
-                        </select>
+                    <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-lg font-bold text-gray-300">Telemetry Chart</h2>
+                            <span className={`px-2 py-0.5 text-xs font-semibold rounded border ${
+                                isLive 
+                                    ? 'bg-emerald-950/80 text-emerald-400 border-emerald-700' 
+                                    : 'bg-blue-950/80 text-blue-400 border-blue-700'
+                            }`}>
+                                {isLive ? '🔴 LIVE STREAMING' : '📜 HISTORICAL (STATIC)'}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <select className="bg-gray-700 text-white border border-gray-600 rounded px-2.5 py-1 text-sm outline-none cursor-pointer hover:bg-gray-650"
+                                value={timeRange} onChange={(e) => setTimeRange(parseFloat(e.target.value))}>
+                                <option value={0.083}>Last 5 Minutes (Live)</option>
+                                <option value={0.5}>Last 30 Minutes</option>
+                                <option value={1}>Last 1 Hour</option>
+                                <option value={6}>Last 6 Hours</option>
+                                <option value={24}>Last 24 Hours</option>
+                                <option value={72}>Last 72 Hours</option>
+                            </select>
+                            <button
+                                onClick={() => onRefresh && onRefresh()}
+                                disabled={isRefreshing}
+                                className="flex items-center gap-1.5 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200 border border-gray-600 px-3 py-1 rounded text-sm font-medium transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+                                title="Query database for updated data"
+                            >
+                                <span className={`inline-block text-xs ${isRefreshing ? 'animate-spin' : ''}`}>🔄</span>
+                                <span>Refresh</span>
+                            </button>
+                        </div>
                     </div>
                     <div className="relative flex-1 min-h-[350px]">
                         <canvas ref={canvasRef}></canvas>
