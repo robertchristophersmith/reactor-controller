@@ -3,6 +3,8 @@ import urllib.parse
 import json
 import time
 
+__test__ = False
+
 BASE_URL = "http://localhost:8000"
 
 def post_req(url):

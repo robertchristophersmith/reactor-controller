@@ -493,6 +493,7 @@
             const latestRef = useRef(latest);
             const isLive = timeRange === 0.083;
             const isLiveRef = useRef(isLive);
+            const timeRangeRef = useRef(timeRange);
 
             useEffect(() => {
                 latestRef.current = latest;
@@ -500,11 +501,54 @@
 
             useEffect(() => {
                 isLiveRef.current = isLive;
-            }, [isLive]);
+                timeRangeRef.current = timeRange;
+            }, [isLive, timeRange]);
 
+            const parseTs = (tVal) => {
+                if (!tVal) return Date.now();
+                if (typeof tVal === 'number') return tVal;
+                let s = String(tVal).trim();
+                s = s.replace(' ', 'T');
+                if (!s.endsWith('Z') && !s.includes('+') && !s.includes('-', 10)) {
+                    s += 'Z';
+                }
+                const parsed = new Date(s).getTime();
+                return isNaN(parsed) ? Date.now() : parsed;
+            };
+
+            const formatDatasetData = useCallback((dataList) => {
+                const weightPts = [];
+                const speedPts = [];
+                const feedResPts = [];
+                const feedPrePts = [];
+                const liqReacPts = [];
+                const gasIntPts = [];
+                const gasExtPts = [];
+
+                if (Array.isArray(dataList)) {
+                    dataList.forEach(item => {
+                        const s = item.sensors || {};
+                        const p = item.pump || {};
+                        const tVal = parseTs(item.ts);
+
+                        if (s.weight != null) weightPts.push({ x: tVal, y: s.weight });
+                        if (p.speed != null) speedPts.push({ x: tVal, y: p.speed });
+                        if (s.t_feed_res != null) feedResPts.push({ x: tVal, y: s.t_feed_res });
+                        if (s.t_feed_pre != null) feedPrePts.push({ x: tVal, y: s.t_feed_pre });
+                        if (s.t_liq_reac != null) liqReacPts.push({ x: tVal, y: s.t_liq_reac });
+                        if (s.t_gas_reac_int != null) gasIntPts.push({ x: tVal, y: s.t_gas_reac_int });
+                        if (s.t_gas_reac_ext != null) gasExtPts.push({ x: tVal, y: s.t_gas_reac_ext });
+                    });
+                }
+                return { weightPts, speedPts, feedResPts, feedPrePts, liqReacPts, gasIntPts, gasExtPts };
+            }, []);
+
+            // Rebuild chart when isLive changes
             useEffect(() => {
                 if (!canvasRef.current) return;
                 const ctx = canvasRef.current.getContext('2d');
+
+                const initialData = formatDatasetData(data);
 
                 const datasets = [
                     {
@@ -514,7 +558,8 @@
                         backgroundColor: '#14B8A6',
                         borderWidth: 2,
                         pointRadius: 0,
-                        data: []
+                        pointHoverRadius: 4,
+                        data: initialData.weightPts
                     },
                     {
                         label: 'Pump Speed',
@@ -524,7 +569,8 @@
                         borderWidth: 2,
                         stepped: 'after',
                         pointRadius: 0,
-                        data: []
+                        pointHoverRadius: 4,
+                        data: initialData.speedPts
                     },
                     {
                         label: 'Feed Res (°C)',
@@ -533,7 +579,8 @@
                         backgroundColor: '#2DD4BF',
                         borderWidth: 2,
                         pointRadius: 0,
-                        data: []
+                        pointHoverRadius: 4,
+                        data: initialData.feedResPts
                     },
                     {
                         label: 'Feed Pre (°C)',
@@ -542,7 +589,8 @@
                         backgroundColor: '#FBBF24',
                         borderWidth: 2,
                         pointRadius: 0,
-                        data: []
+                        pointHoverRadius: 4,
+                        data: initialData.feedPrePts
                     },
                     {
                         label: 'Liq Reac (°C)',
@@ -551,7 +599,8 @@
                         backgroundColor: '#EF4444',
                         borderWidth: 2,
                         pointRadius: 0,
-                        data: []
+                        pointHoverRadius: 4,
+                        data: initialData.liqReacPts
                     },
                     {
                         label: 'Gas Int (°C)',
@@ -560,7 +609,8 @@
                         backgroundColor: '#A78BFA',
                         borderWidth: 2,
                         pointRadius: 0,
-                        data: []
+                        pointHoverRadius: 4,
+                        data: initialData.gasIntPts
                     },
                     {
                         label: 'Gas Ext (°C)',
@@ -569,9 +619,52 @@
                         backgroundColor: '#6366F1',
                         borderWidth: 2,
                         pointRadius: 0,
-                        data: []
+                        pointHoverRadius: 4,
+                        data: initialData.gasExtPts
                     }
                 ];
+
+                const xScaleConfig = isLive ? {
+                    type: 'realtime',
+                    realtime: {
+                        duration: timeRange * 3600 * 1000,
+                        refresh: 1000,
+                        delay: 1000,
+                        pause: false,
+                        onRefresh: (chart) => {
+                            if (!isLiveRef.current) return;
+                            const l = latestRef.current;
+                            if (!l) return;
+                            const now = Date.now();
+                            const s = l.sensors || {};
+                            const p = l.pump || {};
+
+                            chart.data.datasets[0].data.push({ x: now, y: s.weight ?? null });
+                            chart.data.datasets[1].data.push({ x: now, y: p.speed ?? null });
+                            chart.data.datasets[2].data.push({ x: now, y: s.t_feed_res ?? null });
+                            chart.data.datasets[3].data.push({ x: now, y: s.t_feed_pre ?? null });
+                            chart.data.datasets[4].data.push({ x: now, y: s.t_liq_reac ?? null });
+                            chart.data.datasets[5].data.push({ x: now, y: s.t_gas_reac_int ?? null });
+                            chart.data.datasets[6].data.push({ x: now, y: s.t_gas_reac_ext ?? null });
+                        }
+                    },
+                    ticks: { color: '#9CA3AF' },
+                    grid: { color: '#374151' }
+                } : {
+                    type: 'time',
+                    time: {
+                        displayFormats: {
+                            minute: 'HH:mm',
+                            hour: 'HH:mm',
+                            day: 'MMM d HH:mm'
+                        },
+                        tooltipFormat: 'yyyy-MM-dd HH:mm:ss'
+                    },
+                    min: Date.now() - timeRange * 3600 * 1000,
+                    max: Date.now(),
+                    ticks: { color: '#9CA3AF' },
+                    grid: { color: '#374151' }
+                };
 
                 const config = {
                     type: 'line',
@@ -600,33 +693,7 @@
                             }
                         },
                         scales: {
-                            x: {
-                                type: 'realtime',
-                                realtime: {
-                                    duration: timeRange * 3600 * 1000,
-                                    refresh: 1000,
-                                    delay: 1000,
-                                    pause: !isLiveRef.current,
-                                    onRefresh: (chart) => {
-                                        if (!isLiveRef.current) return;
-                                        const l = latestRef.current;
-                                        if (!l) return;
-                                        const now = Date.now();
-                                        const s = l.sensors || {};
-                                        const p = l.pump || {};
-
-                                        chart.data.datasets[0].data.push({ x: now, y: s.weight ?? null });
-                                        chart.data.datasets[1].data.push({ x: now, y: p.speed ?? null });
-                                        chart.data.datasets[2].data.push({ x: now, y: s.t_feed_res ?? null });
-                                        chart.data.datasets[3].data.push({ x: now, y: s.t_feed_pre ?? null });
-                                        chart.data.datasets[4].data.push({ x: now, y: s.t_liq_reac ?? null });
-                                        chart.data.datasets[5].data.push({ x: now, y: s.t_gas_reac_int ?? null });
-                                        chart.data.datasets[6].data.push({ x: now, y: s.t_gas_reac_ext ?? null });
-                                    }
-                                },
-                                ticks: { color: '#9CA3AF' },
-                                grid: { color: '#374151' }
-                            },
+                            x: xScaleConfig,
                             yWeight: {
                                 type: 'linear',
                                 display: true,
@@ -647,6 +714,9 @@
                     }
                 };
 
+                if (chartInstanceRef.current) {
+                    chartInstanceRef.current.destroy();
+                }
                 const chartInstance = new Chart(ctx, config);
                 chartInstanceRef.current = chartInstance;
 
@@ -654,59 +724,29 @@
                     chartInstance.destroy();
                     chartInstanceRef.current = null;
                 };
-            }, []);
+            }, [isLive]);
 
+            // Update chart data when data or timeRange changes (especially in historical mode)
             useEffect(() => {
                 const chart = chartInstanceRef.current;
                 if (!chart) return;
 
-                chart.options.scales.x.realtime.duration = timeRange * 3600 * 1000;
-                chart.options.scales.x.realtime.pause = !isLive;
-
-                if (Array.isArray(data)) {
-                    const weightPts = [];
-                    const speedPts = [];
-                    const feedResPts = [];
-                    const feedPrePts = [];
-                    const liqReacPts = [];
-                    const gasIntPts = [];
-                    const gasExtPts = [];
-
-                    data.forEach(item => {
-                        const s = item.sensors || {};
-                        const p = item.pump || {};
-                        let tVal = item.ts;
-                        if (typeof tVal === 'string') {
-                            if (tVal.includes('T')) {
-                                tVal = new Date(tVal).getTime();
-                            } else {
-                                const today = new Date().toISOString().split('T')[0];
-                                tVal = new Date(`${today}T${tVal}`).getTime();
-                            }
-                        } else if (!tVal) {
-                            tVal = Date.now();
-                        }
-
-                        if (s.weight != null) weightPts.push({ x: tVal, y: s.weight });
-                        if (p.speed != null) speedPts.push({ x: tVal, y: p.speed });
-                        if (s.t_feed_res != null) feedResPts.push({ x: tVal, y: s.t_feed_res });
-                        if (s.t_feed_pre != null) feedPrePts.push({ x: tVal, y: s.t_feed_pre });
-                        if (s.t_liq_reac != null) liqReacPts.push({ x: tVal, y: s.t_liq_reac });
-                        if (s.t_gas_reac_int != null) gasIntPts.push({ x: tVal, y: s.t_gas_reac_int });
-                        if (s.t_gas_reac_ext != null) gasExtPts.push({ x: tVal, y: s.t_gas_reac_ext });
-                    });
-
-                    chart.data.datasets[0].data = weightPts;
-                    chart.data.datasets[1].data = speedPts;
-                    chart.data.datasets[2].data = feedResPts;
-                    chart.data.datasets[3].data = feedPrePts;
-                    chart.data.datasets[4].data = liqReacPts;
-                    chart.data.datasets[5].data = gasIntPts;
-                    chart.data.datasets[6].data = gasExtPts;
+                if (!isLive) {
+                    chart.options.scales.x.min = Date.now() - timeRange * 3600 * 1000;
+                    chart.options.scales.x.max = Date.now();
                 }
 
+                const formatted = formatDatasetData(data);
+                chart.data.datasets[0].data = formatted.weightPts;
+                chart.data.datasets[1].data = formatted.speedPts;
+                chart.data.datasets[2].data = formatted.feedResPts;
+                chart.data.datasets[3].data = formatted.feedPrePts;
+                chart.data.datasets[4].data = formatted.liqReacPts;
+                chart.data.datasets[5].data = formatted.gasIntPts;
+                chart.data.datasets[6].data = formatted.gasExtPts;
+
                 chart.update('quiet');
-            }, [data, timeRange, isLive]);
+            }, [data, timeRange, isLive, formatDatasetData]);
 
             return (
                 <div className="flex-1 bg-gray-800 p-4 rounded-lg min-h-[400px] border border-gray-700 shadow-inner flex flex-col">

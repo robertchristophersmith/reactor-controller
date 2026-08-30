@@ -96,13 +96,18 @@ def get_history_downsampled(db: Session, hours: float, max_points: int = 300):
     # - 1m rollups for periods up to 6 hours (e.g. 6h)
     # - 10m rollups for long periods (e.g. 24h, 72h)
     if hours <= 1.0:
-        Table = Logs1s
+        candidate_tables = [Logs1s]
     elif hours <= 6.0:
-        Table = Logs1m
+        candidate_tables = [Logs1m, Logs1s]
     else:
-        Table = Logs10m
+        candidate_tables = [Logs10m, Logs1m, Logs1s]
         
-    logs = db.query(Table).filter(Table.timestamp >= cutoff).order_by(Table.timestamp.asc()).all()
+    logs = []
+    for Table in candidate_tables:
+        logs = db.query(Table).filter(Table.timestamp >= cutoff).order_by(Table.timestamp.asc()).all()
+        if logs:
+            break
+            
     if not logs:
         return []
         
@@ -112,8 +117,12 @@ def get_history_downsampled(db: Session, hours: float, max_points: int = 300):
     
     result = []
     for log in sampled:
+        ts_str = log.timestamp.isoformat() if log.timestamp else ""
+        if ts_str and not ts_str.endswith("Z"):
+            ts_str += "Z"
+            
         result.append({
-            "ts": log.timestamp.isoformat(),
+            "ts": ts_str,
             "uptime": log.uptime,
             "state": log.control_state,
             "sensors": {
@@ -127,6 +136,16 @@ def get_history_downsampled(db: Session, hours: float, max_points: int = 300):
             },
             "pump": {
                 "speed": log.pump_speed
+            },
+            "heaters": {
+                "feed_pre": getattr(log, "heater_feed_pre", 0.0),
+                "liq_reac": getattr(log, "heater_liq_reac", 0.0),
+                "gas_reac": getattr(log, "heater_gas_reac", 0.0)
+            },
+            "sp": {
+                "feed_pre": getattr(log, "sp_feed_pre", 0.0),
+                "liq_reac": getattr(log, "sp_liq_reac", 0.0),
+                "gas_reac": getattr(log, "sp_gas_reac", 0.0)
             }
         })
     return result
