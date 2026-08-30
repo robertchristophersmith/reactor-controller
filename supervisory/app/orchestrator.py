@@ -538,10 +538,11 @@ class Orchestrator:
             await asyncio.sleep(60)
             try:
                 with SessionLocal() as db:
-                    from .crud import perform_1m_rollup
+                    from .crud import perform_1m_rollup, prune_expired_logs
                     perform_1m_rollup(db)
+                    prune_expired_logs(db, raw_retention_hours=1.5, rollup_1m_retention_hours=8.0)
             except Exception as e:
-                logger.error(f"1m Rollup Error: {e}")
+                logger.error(f"1m Rollup / Prune Error: {e}")
 
     async def heartbeat_loop(self):
         start_time = time.time()
@@ -596,10 +597,11 @@ class Orchestrator:
             await asyncio.sleep(600)
             try:
                 with SessionLocal() as db:
-                    from .crud import perform_10m_rollup
+                    from .crud import perform_10m_rollup, prune_expired_logs
                     perform_10m_rollup(db)
+                    prune_expired_logs(db, raw_retention_hours=1.5, rollup_1m_retention_hours=8.0)
             except Exception as e:
-                logger.error(f"10m Rollup Error: {e}")
+                logger.error(f"10m Rollup / Prune Error: {e}")
 
     async def send_command_setpoint(self, zone: int, value: float):
          await serial_link.send_command({"cmd": "SET_TEMP", "zone": zone, "val": value})

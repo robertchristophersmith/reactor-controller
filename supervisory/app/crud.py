@@ -166,7 +166,8 @@ def perform_1m_rollup(db: Session):
             AVG(heater_feed_pre), AVG(heater_liq_reac), AVG(heater_gas_reac),
             AVG(sp_feed_pre), AVG(sp_liq_reac), AVG(sp_gas_reac)
         FROM logs_1s
-        WHERE timestamp >= datetime('now', '-1 minute')
+        WHERE timestamp > COALESCE((SELECT MAX(timestamp) FROM logs_1m), datetime('now', '-2 minutes'))
+        GROUP BY strftime('%Y-%m-%d %H:%M:00', timestamp)
         HAVING MAX(timestamp) IS NOT NULL
     """)
     db.execute(sql)
@@ -186,8 +187,17 @@ def perform_10m_rollup(db: Session):
             AVG(heater_feed_pre), AVG(heater_liq_reac), AVG(heater_gas_reac),
             AVG(sp_feed_pre), AVG(sp_liq_reac), AVG(sp_gas_reac)
         FROM logs_1m
-        WHERE timestamp >= datetime('now', '-10 minutes')
+        WHERE timestamp > COALESCE((SELECT MAX(timestamp) FROM logs_10m), datetime('now', '-20 minutes'))
+        GROUP BY (strftime('%s', timestamp) / 600)
         HAVING MAX(timestamp) IS NOT NULL
     """)
     db.execute(sql)
+    db.commit()
+
+def prune_expired_logs(db: Session, raw_retention_hours: float = 1.5, rollup_1m_retention_hours: float = 8.0):
+    raw_cutoff = datetime.utcnow() - timedelta(hours=raw_retention_hours)
+    rollup_cutoff = datetime.utcnow() - timedelta(hours=rollup_1m_retention_hours)
+    
+    db.query(Logs1s).filter(Logs1s.timestamp < raw_cutoff).delete()
+    db.query(Logs1m).filter(Logs1m.timestamp < rollup_cutoff).delete()
     db.commit()

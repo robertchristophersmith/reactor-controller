@@ -167,3 +167,166 @@ class TestHistory:
             assert len(r10m) == 1
             assert r10m[0].control_state == 2
             assert r10m[0].temp_feed_pre == 110.0
+
+    def test_prune_expired_logs(self):
+        from supervisory.app.crud import prune_expired_logs
+        with SessionLocal() as db:
+            now = datetime.utcnow()
+            # 1s log 3 hours ago (should be pruned with raw_retention=1.5h)
+            old_1s = Logs1s(
+                timestamp=now - timedelta(hours=3),
+                uptime=100.0,
+                control_state=2,
+                temp_feed_res=20.0,
+                temp_feed_pre=100.0,
+                temp_liq_reac=150.0,
+                temp_gas_reac_int=180.0,
+                temp_gas_reac_ext=185.0,
+                h2_ppm=0.0,
+                weight=1.0,
+                pump_speed=50,
+                heater_feed_pre=10.0,
+                heater_liq_reac=20.0,
+                heater_gas_reac=30.0,
+                sp_feed_pre=100.0,
+                sp_liq_reac=150.0,
+                sp_gas_reac=180.0
+            )
+            # 1s log 30 mins ago (should be kept)
+            recent_1s = Logs1s(
+                timestamp=now - timedelta(minutes=30),
+                uptime=200.0,
+                control_state=2,
+                temp_feed_res=20.0,
+                temp_feed_pre=100.0,
+                temp_liq_reac=150.0,
+                temp_gas_reac_int=180.0,
+                temp_gas_reac_ext=185.0,
+                h2_ppm=0.0,
+                weight=1.0,
+                pump_speed=50,
+                heater_feed_pre=10.0,
+                heater_liq_reac=20.0,
+                heater_gas_reac=30.0,
+                sp_feed_pre=100.0,
+                sp_liq_reac=150.0,
+                sp_gas_reac=180.0
+            )
+            # 1m log 10 hours ago (should be pruned with rollup_retention=8.0h)
+            old_1m = Logs1m(
+                timestamp=now - timedelta(hours=10),
+                uptime=50.0,
+                control_state=2,
+                temp_feed_res=20.0,
+                temp_feed_pre=100.0,
+                temp_liq_reac=150.0,
+                temp_gas_reac_int=180.0,
+                temp_gas_reac_ext=185.0,
+                h2_ppm=0.0,
+                weight=1.0,
+                pump_speed=50,
+                heater_feed_pre=10.0,
+                heater_liq_reac=20.0,
+                heater_gas_reac=30.0,
+                sp_feed_pre=100.0,
+                sp_liq_reac=150.0,
+                sp_gas_reac=180.0
+            )
+            # 1m log 2 hours ago (should be kept)
+            recent_1m = Logs1m(
+                timestamp=now - timedelta(hours=2),
+                uptime=300.0,
+                control_state=2,
+                temp_feed_res=20.0,
+                temp_feed_pre=100.0,
+                temp_liq_reac=150.0,
+                temp_gas_reac_int=180.0,
+                temp_gas_reac_ext=185.0,
+                h2_ppm=0.0,
+                weight=1.0,
+                pump_speed=50,
+                heater_feed_pre=10.0,
+                heater_liq_reac=20.0,
+                heater_gas_reac=30.0,
+                sp_feed_pre=100.0,
+                sp_liq_reac=150.0,
+                sp_gas_reac=180.0
+            )
+            db.add_all([old_1s, recent_1s, old_1m, recent_1m])
+            db.commit()
+
+            prune_expired_logs(db, raw_retention_hours=1.5, rollup_1m_retention_hours=8.0)
+
+            assert db.query(Logs1s).count() == 1
+            assert db.query(Logs1s).first().uptime == 200.0
+
+            assert db.query(Logs1m).count() == 1
+            assert db.query(Logs1m).first().uptime == 300.0
+
+    def test_backfill_and_prune_script(self, tmp_path):
+        from supervisory.backfill_and_prune import run_backfill_and_prune
+        test_db_path = str(tmp_path / "test_migration.db")
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        
+        eng = create_engine(f"sqlite:///{test_db_path}")
+        Base.metadata.create_all(bind=eng)
+        TestSession = sessionmaker(bind=eng)
+
+        now = datetime.utcnow()
+        with TestSession() as db:
+            # Create 120 1-second records spanning 2 minutes (1 record/sec)
+            for i in range(120):
+                log = Logs1s(
+                    timestamp=now - timedelta(hours=3, seconds=120 - i),
+                    uptime=float(i),
+                    control_state=2,
+                    temp_feed_res=20.0,
+                    temp_feed_pre=100.0,
+                    temp_liq_reac=150.0,
+                    temp_gas_reac_int=180.0,
+                    temp_gas_reac_ext=185.0,
+                    h2_ppm=0.0,
+                    weight=1.0,
+                    pump_speed=50,
+                    heater_feed_pre=10.0,
+                    heater_liq_reac=20.0,
+                    heater_gas_reac=30.0,
+                    sp_feed_pre=100.0,
+                    sp_liq_reac=150.0,
+                    sp_gas_reac=180.0
+                )
+                db.add(log)
+            # Add a recent 1-second record
+            recent = Logs1s(
+                timestamp=now - timedelta(minutes=10),
+                uptime=500.0,
+                control_state=2,
+                temp_feed_res=20.0,
+                temp_feed_pre=100.0,
+                temp_liq_reac=150.0,
+                temp_gas_reac_int=180.0,
+                temp_gas_reac_ext=185.0,
+                h2_ppm=0.0,
+                weight=1.0,
+                pump_speed=50,
+                heater_feed_pre=10.0,
+                heater_liq_reac=20.0,
+                heater_gas_reac=30.0,
+                sp_feed_pre=100.0,
+                sp_liq_reac=150.0,
+                sp_gas_reac=180.0
+            )
+            db.add(recent)
+            db.commit()
+
+        run_backfill_and_prune(test_db_path, raw_retention_hours=1.5, rollup_1m_retention_hours=8.0)
+
+        with TestSession() as db:
+            # 1m rollups should have been created
+            assert db.query(Logs1m).count() >= 2
+            # 10m rollups should have been created
+            assert db.query(Logs10m).count() >= 1
+            # Old 1s records (3 hours ago) should be pruned, recent one kept
+            assert db.query(Logs1s).count() == 1
+            assert db.query(Logs1s).first().uptime == 500.0
