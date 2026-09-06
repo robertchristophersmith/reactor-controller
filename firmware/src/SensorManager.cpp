@@ -1,5 +1,6 @@
 #include "SensorManager.h"
 #include <EEPROM.h>
+#include <math.h>
 
 const int EEPROM_CALIBRATION_ADDR = 0;
 const uint32_t CALIBRATION_MAGIC = 0x1A2B3C4D;
@@ -12,10 +13,6 @@ struct LoadCellCalibration {
 
 SensorManager::SensorManager() {
   _tcFeedstockReservoir = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_FEEDSTOCK_RESERVOIR, PIN_SPI_MISO);
-  _tcFeedstockPreheater = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_FEEDSTOCK_PREHEATER, PIN_SPI_MISO);
-  _tcLiquidReactor = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_LIQUID_REACTOR, PIN_SPI_MISO);
-  _tcGasReactorInt = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_GAS_REACTOR_INT, PIN_SPI_MISO);
-  _tcGasReactorExt = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_GAS_REACTOR_EXT, PIN_SPI_MISO);
   _tcElectronicsHousing = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_TC_ELECTRONICS_HOUSING, PIN_SPI_MISO);
 
   for (int i = 0; i < 6; i++) {
@@ -30,37 +27,35 @@ void SensorManager::begin() {
   pinMode(53, OUTPUT);
   digitalWrite(53, HIGH);
 
-  // Initialize Chip Selects
+  // Initialize Thermocouple Chip Selects
   pinMode(PIN_SPI_CS_TC_FEEDSTOCK_RESERVOIR, OUTPUT);
-  pinMode(PIN_SPI_CS_TC_FEEDSTOCK_PREHEATER, OUTPUT);
-  pinMode(PIN_SPI_CS_TC_LIQUID_REACTOR, OUTPUT);
-  pinMode(PIN_SPI_CS_TC_GAS_REACTOR_INT, OUTPUT);
-  pinMode(PIN_SPI_CS_TC_GAS_REACTOR_EXT, OUTPUT);
   pinMode(PIN_SPI_CS_TC_ELECTRONICS_HOUSING, OUTPUT);
-
   digitalWrite(PIN_SPI_CS_TC_FEEDSTOCK_RESERVOIR, HIGH);
-  digitalWrite(PIN_SPI_CS_TC_FEEDSTOCK_PREHEATER, HIGH);
-  digitalWrite(PIN_SPI_CS_TC_LIQUID_REACTOR, HIGH);
-  digitalWrite(PIN_SPI_CS_TC_GAS_REACTOR_INT, HIGH);
-  digitalWrite(PIN_SPI_CS_TC_GAS_REACTOR_EXT, HIGH);
   digitalWrite(PIN_SPI_CS_TC_ELECTRONICS_HOUSING, HIGH);
 
-  // Initialize Hardware SPI before TC instances begin
-  SPI.begin();
-  // Slow down SPI to ~500kHz (16MHz / 32) for stability
-  SPI.setClockDivider(SPI_CLOCK_DIV32);
+  // Initialize RTD Chip Selects (SEN-30203 Quad Shield)
+  pinMode(PIN_SPI_CS_RTD_FEEDSTOCK_PREHEATER, OUTPUT);
+  pinMode(PIN_SPI_CS_RTD_LIQUID_REACTOR, OUTPUT);
+  pinMode(PIN_SPI_CS_RTD_GAS_REACTOR_INT, OUTPUT);
+  pinMode(PIN_SPI_CS_RTD_GAS_REACTOR_EXT, OUTPUT);
+  digitalWrite(PIN_SPI_CS_RTD_FEEDSTOCK_PREHEATER, HIGH);
+  digitalWrite(PIN_SPI_CS_RTD_LIQUID_REACTOR, HIGH);
+  digitalWrite(PIN_SPI_CS_RTD_GAS_REACTOR_INT, HIGH);
+  digitalWrite(PIN_SPI_CS_RTD_GAS_REACTOR_EXT, HIGH);
 
-  // Initialize TC instances
+  // Initialize Hardware SPI for MAX31865 RTD shield
+  SPI.begin();
+  SPI.setClockDivider(SPI_CLOCK_DIV16);
+
+  // Initialize RTD channels (3-wire PT100)
+  _rtdPreheater.begin(PIN_SPI_CS_RTD_FEEDSTOCK_PREHEATER, RTD_3_WIRE, RTD_TYPE_PT100, SPI);
+  _rtdLiquidReactor.begin(PIN_SPI_CS_RTD_LIQUID_REACTOR, RTD_3_WIRE, RTD_TYPE_PT100, SPI);
+  _rtdGasReactorInt.begin(PIN_SPI_CS_RTD_GAS_REACTOR_INT, RTD_3_WIRE, RTD_TYPE_PT100, SPI);
+  _rtdGasReactorExt.begin(PIN_SPI_CS_RTD_GAS_REACTOR_EXT, RTD_3_WIRE, RTD_TYPE_PT100, SPI);
+
+  // Initialize Software SPI TC instances (auxiliary channels)
   if (!_tcFeedstockReservoir->begin())
     Serial.println("TC Feedstock Res init failed");
-  if (!_tcFeedstockPreheater->begin())
-    Serial.println("TC Feedstock Pre init failed");
-  if (!_tcLiquidReactor->begin())
-    Serial.println("TC Liquid Reac init failed");
-  if (!_tcGasReactorInt->begin())
-    Serial.println("TC Gas Reac Int init failed");
-  if (!_tcGasReactorExt->begin())
-    Serial.println("TC Gas Reac Ext init failed");
   if (!_tcElectronicsHousing->begin())
     Serial.println("TC Electronics Housing init failed");
 
@@ -85,10 +80,28 @@ void SensorManager::begin() {
   }
 }
 
+float SensorManager::calculateCvdTemperature(float rOhms) {
+  if (isnan(rOhms) || rOhms <= 0.0f) {
+    return NAN;
+  }
+  // Callendar-Van Dusen equation (IEC 751 / DIN EN 60751):
+  // R(T) = R0 * (1 + A * T + B * T^2)
+  // T = (-A + sqrt(A^2 - 4 * B * (1 - R / R0))) / (2 * B)
+  const float R0 = 100.0f;
+  const float A = 3.9083e-3f;
+  const float B = -5.775e-7f;
+
+  float discriminant = (A * A) - (4.0f * B * (1.0f - (rOhms / R0)));
+  if (discriminant < 0.0f) {
+    return NAN;
+  }
+  return (-A + sqrt(discriminant)) / (2.0f * B);
+}
+
 void SensorManager::update() {
   _currentData.sensorStatus = 0;
 
-  // Helper with 5-read transient debouncer and exact error byte extraction
+  // Helper with 5-read transient debouncer for MAX31855 thermocouples
   auto readTcDebounced = [&](Adafruit_MAX31855 *tc, const char *name, int idx, uint32_t errBit, uint8_t &exactErrOut) -> float {
     float t = tc->readCelsius();
     float internal = tc->readInternal();
@@ -120,12 +133,48 @@ void SensorManager::update() {
     }
   };
 
+  // Helper with 5-read transient debouncer for MAX31865 RTDs
+  auto readRtdDebounced = [&](MAX31865 &rtd, const char *name, int idx, uint32_t errBit, uint8_t &exactErrOut) -> float {
+    rtd.sample();
+    uint8_t status = rtd.getStatus();
+    float r = rtd.getResistance();
+    float t = calculateCvdTemperature(r);
+
+    bool isError = (status != 0) || isnan(t) || (r <= 0.0f);
+
+    if (!isError) {
+      // Valid reading: clear error counter and save last valid temp
+      _errorCount[idx] = 0;
+      _lastExactErr[idx] = 0;
+      _lastValidTemp[idx] = t;
+      exactErrOut = 0;
+      return t;
+    }
+
+    // Error detected
+    _errorCount[idx]++;
+    exactErrOut = (status != 0) ? status : 0x08; // 0x08 = Comm Fault / NaN
+    _lastExactErr[idx] = exactErrOut;
+
+    if (_errorCount[idx] < 6) {
+      // Transient error (1 to 5 reads): hold previous valid temp
+      return _lastValidTemp[idx];
+    } else {
+      // Persistent error (6th+ read): set error bit and return previous valid temp for safe PID control
+      _currentData.sensorStatus |= errBit;
+      return _lastValidTemp[idx];
+    }
+  };
+
+  // Read Auxiliary Thermocouples
   _currentData.tempFeedstockReservoir = readTcDebounced(_tcFeedstockReservoir, "FeedRes", 0, ERR_TC_FEEDSTOCK_RESERVOIR, _currentData.errFeedstockReservoir);
-  _currentData.tempFeedstockPreheater = readTcDebounced(_tcFeedstockPreheater, "FeedPre", 1, ERR_TC_FEEDSTOCK_PREHEATER, _currentData.errFeedstockPreheater);
-  _currentData.tempLiquidReactor = readTcDebounced(_tcLiquidReactor, "LiqReac", 2, ERR_TC_LIQUID_REACTOR, _currentData.errLiquidReactor);
-  _currentData.tempGasReactorInt = readTcDebounced(_tcGasReactorInt, "GasReacInt", 3, ERR_TC_GAS_REACTOR_INT, _currentData.errGasReactorInt);
-  _currentData.tempGasReactorExt = readTcDebounced(_tcGasReactorExt, "GasReacExt", 4, ERR_TC_GAS_REACTOR_EXT, _currentData.errGasReactorExt);
   _currentData.tempElectronicsHousing = readTcDebounced(_tcElectronicsHousing, "ElecHousing", 5, ERR_TC_ELECTRONICS_HOUSING, _currentData.errElectronicsHousing);
+
+  // Read Core Process RTDs (PWFusion SEN-30203 Quad MAX31865)
+  _currentData.tempFeedstockPreheater = readRtdDebounced(_rtdPreheater, "FeedPre", 1, ERR_RTD_FEEDSTOCK_PREHEATER, _currentData.errFeedstockPreheater);
+  _currentData.tempLiquidReactor = readRtdDebounced(_rtdLiquidReactor, "LiqReac", 2, ERR_RTD_LIQUID_REACTOR, _currentData.errLiquidReactor);
+  _currentData.tempGasReactorInt = readRtdDebounced(_rtdGasReactorInt, "GasReacInt", 3, ERR_RTD_GAS_REACTOR_INT, _currentData.errGasReactorInt);
+  _currentData.tempGasReactorExt = readRtdDebounced(_rtdGasReactorExt, "GasReacExt", 4, ERR_RTD_GAS_REACTOR_EXT, _currentData.errGasReactorExt);
 
   _currentData.sensorsHealthy = (_currentData.sensorStatus == 0);
 
@@ -189,18 +238,3 @@ void SensorManager::calibrateLoadCell(float knownWeight) {
     }
   }
 }
-
-/*
-float SensorManager::readScaled(Adafruit_ADS1115 &ads, int channel, float vMin,
-                                float vMax, float euMin, float euMax) {
-  int16_t adc = ads.readADC_SingleEnded(channel);
-  float voltage = ads.computeVolts(adc);
-
-  if (voltage <= vMin)
-    return euMin;
-  if (voltage >= vMax)
-    return euMax;
-
-  return euMin + (voltage - vMin) * (euMax - euMin) / (vMax - vMin);
-}
-*/

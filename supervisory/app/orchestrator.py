@@ -495,35 +495,44 @@ class Orchestrator:
         status_mask = s.get("status", 0)
         tc_errors = s.get("tc_errors", {})
 
-        tc_definitions = [
-            ("t_feed_res", (1 << 0), "Feedstock Reservoir TC"),
-            ("t_feed_pre", (1 << 1), "Feedstock Preheater TC"),
-            ("t_liq_reac", (1 << 2), "Liquid Reactor TC"),
-            ("t_gas_reac_int", (1 << 3), "Gas Reactor Int TC"),
-            ("t_gas_reac_ext", (1 << 4), "Gas Reactor Ext TC"),
-            ("t_elec_housing", (1 << 5), "Electronics Housing TC")
+        sensor_definitions = [
+            ("t_feed_res", (1 << 0), "Feedstock Reservoir TC", False),
+            ("t_feed_pre", (1 << 1), "Feedstock Preheater RTD", True),
+            ("t_liq_reac", (1 << 2), "Liquid Reactor RTD", True),
+            ("t_gas_reac_int", (1 << 3), "Gas Reactor Int RTD", True),
+            ("t_gas_reac_ext", (1 << 4), "Gas Reactor Ext RTD", True),
+            ("t_elec_housing", (1 << 5), "Electronics Housing TC", False)
         ]
 
-        def format_exact_err(err_code: int) -> str:
+        def format_exact_err(err_code: int, is_rtd: bool) -> str:
             if err_code == 0:
                 return "OK"
             details = []
-            if err_code & 0x01: details.append("Open Circuit (0x01)")
-            if err_code & 0x02: details.append("Short to GND (0x02)")
-            if err_code & 0x04: details.append("Short to VCC (0x04)")
-            if err_code & 0x08: details.append("Comm Fault / NaN (0x08)")
-            return "MAX31855 " + (", ".join(details) if details else f"Fault (0x{err_code:02X})")
+            if is_rtd:
+                if err_code & 0x04: details.append("Voltage Out of Range (0x04)")
+                if err_code & 0x08: details.append("RTDIn- / Force- Open (0x08)")
+                if err_code & 0x10: details.append("RefIn- Low / Open (0x10)")
+                if err_code & 0x20: details.append("RefIn- High (0x20)")
+                if err_code & 0x40: details.append("Low Temp Threshold (0x40)")
+                if err_code & 0x80: details.append("High Temp Threshold (0x80)")
+                return "MAX31865 " + (", ".join(details) if details else f"Fault (0x{err_code:02X})")
+            else:
+                if err_code & 0x01: details.append("Open Circuit (0x01)")
+                if err_code & 0x02: details.append("Short to GND (0x02)")
+                if err_code & 0x04: details.append("Short to VCC (0x04)")
+                if err_code & 0x08: details.append("Comm Fault / NaN (0x08)")
+                return "MAX31855 " + (", ".join(details) if details else f"Fault (0x{err_code:02X})")
 
         try:
             with SessionLocal() as db:
                 from .crud import create_error_log, resolve_error_log
-                for key, bit, label in tc_definitions:
+                for key, bit, label, is_rtd in sensor_definitions:
                     is_persistent_fault = bool(status_mask & bit)
                     err_code = tc_errors.get(key, 0x08 if is_persistent_fault else 0)
 
                     if is_persistent_fault:
                         if key not in self.active_db_errors:
-                            exact_str = format_exact_err(err_code)
+                            exact_str = format_exact_err(err_code, is_rtd)
                             log_obj = create_error_log(db, label, exact_str)
                             self.active_db_errors[key] = log_obj.id
                     else:

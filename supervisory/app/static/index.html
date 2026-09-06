@@ -346,19 +346,19 @@
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         {/* Feedstock Reservoir */}
                         <SensorCard title="Feedstock Reservoir" value={s.t_feed_res} unit="°C" color="text-teal-400" border="border-teal-500"
-                            errorMsg={parseExactError(errMask, 1<<0, s.tc_errors?.t_feed_res)} />
+                            errorMsg={parseExactError(errMask, 1<<0, s.tc_errors?.t_feed_res, false)} />
 
                         {/* Feedstock Preheater */}
                         <ZoneCard title="Feedstock Preheater"
                             temp={s.t_feed_pre} sp={sp.feed_pre} out={h.feed_pre}
                             onSetSp={(v, r) => sendSetpoint(0, v, r)}
-                            errorMsg={parseExactError(errMask, 1<<1, s.tc_errors?.t_feed_pre)} />
+                            errorMsg={parseExactError(errMask, 1<<1, s.tc_errors?.t_feed_pre, true)} />
 
                         {/* Liquid Reactor */}
                         <ZoneCard title="Liquid Reactor"
                             temp={s.t_liq_reac} sp={sp.liq_reac} out={h.liq_reac}
                             onSetSp={(v, r) => sendSetpoint(1, v, r)}
-                            errorMsg={parseExactError(errMask, 1<<2, s.tc_errors?.t_liq_reac)} />
+                            errorMsg={parseExactError(errMask, 1<<2, s.tc_errors?.t_liq_reac, true)} />
 
                         {/* Gas Reactor */}
                         <ZoneCard title="Gas Reactor"
@@ -368,7 +368,7 @@
                             sub={`Int: ${s.t_gas_reac_int != null && !isNaN(s.t_gas_reac_int) ? Number(s.t_gas_reac_int).toFixed(1) + '°C' : 'ERR'} | Ext: ${s.t_gas_reac_ext != null && !isNaN(s.t_gas_reac_ext) ? Number(s.t_gas_reac_ext).toFixed(1) + '°C' : 'ERR'}`}
                             sp={sp.gas_reac} out={h.gas_reac}
                             onSetSp={(v, r) => sendSetpoint(2, v, r)}
-                            errorMsg={parseExactError(errMask, (1<<3)|(1<<4), s.tc_errors?.t_gas_reac_int || s.tc_errors?.t_gas_reac_ext)} />
+                            errorMsg={parseExactError(errMask, (1<<3)|(1<<4), s.tc_errors?.t_gas_reac_int || s.tc_errors?.t_gas_reac_ext, true)} />
                     </div>
 
                     {/* Chart.js Real-time Streaming & Historical Chart */}
@@ -1010,14 +1010,23 @@
             );
         }
 
-        function parseExactError(statusMask, bitMask, errCode) {
+        function parseExactError(statusMask, bitMask, errCode, isRtd = false) {
             if (!statusMask || !(statusMask & bitMask)) return null;
             if (!errCode || errCode === 0) return "PERSISTENT FAULT";
             let parts = [];
-            if (errCode & 0x01) parts.push("Open Circuit (0x01)");
-            if (errCode & 0x02) parts.push("Short to GND (0x02)");
-            if (errCode & 0x04) parts.push("Short to VCC (0x04)");
-            if (errCode & 0x08) parts.push("Comm Fault / NaN (0x08)");
+            if (isRtd) {
+                if (errCode & 0x04) parts.push("Voltage OOR (0x04)");
+                if (errCode & 0x08) parts.push("RTDIn-/Force- Open (0x08)");
+                if (errCode & 0x10) parts.push("RefIn- Low/Open (0x10)");
+                if (errCode & 0x20) parts.push("RefIn- High (0x20)");
+                if (errCode & 0x40) parts.push("Low Temp Threshold (0x40)");
+                if (errCode & 0x80) parts.push("High Temp Threshold (0x80)");
+            } else {
+                if (errCode & 0x01) parts.push("Open Circuit (0x01)");
+                if (errCode & 0x02) parts.push("Short to GND (0x02)");
+                if (errCode & 0x04) parts.push("Short to VCC (0x04)");
+                if (errCode & 0x08) parts.push("Comm Fault / NaN (0x08)");
+            }
             return parts.length > 0 ? parts.join(", ") : `Fault 0x${errCode.toString(16)}`;
         }
 

@@ -6,8 +6,8 @@
 // --- Communications ---
 #define SERIAL_BAUD 115200
 
-// --- SPI Bus (MAX31855 Thermocouples) ---
-// Software SPI on Pins 7 (CLK) and 5 (MISO) to bypass damaged Mega Pin 50/52
+// --- SPI Bus (Temperature Sensors) ---
+// Software SPI on Pins 7 (CLK) and 5 (MISO) for remaining MAX31855 Thermocouples (Mega Pin 50/52 bypass)
 #ifdef PIN_SPI_SCK
 #undef PIN_SPI_SCK
 #endif
@@ -17,12 +17,26 @@
 #undef PIN_SPI_MISO
 #endif
 #define PIN_SPI_MISO 5
+
+// Thermocouple Channels (MAX31855)
 #define PIN_SPI_CS_TC_FEEDSTOCK_RESERVOIR 38 // Feedstock reservoir
-#define PIN_SPI_CS_TC_FEEDSTOCK_PREHEATER 40  // External feedstock preheater
-#define PIN_SPI_CS_TC_LIQUID_REACTOR 42       // Internal liquid phase reactor
-#define PIN_SPI_CS_TC_GAS_REACTOR_INT 44      // Internal gas phase reactor
-#define PIN_SPI_CS_TC_GAS_REACTOR_EXT 46      // External gas phase reactor
-#define PIN_SPI_CS_TC_ELECTRONICS_HOUSING 36  // Electronics housing temperature monitor
+#define PIN_SPI_CS_TC_ELECTRONICS_HOUSING 36 // Electronics housing temperature monitor
+
+// RTD Channels (PWFusion SEN-30203 Quad MAX31865 PT100)
+#define PIN_SPI_CS_RTD_FEEDSTOCK_PREHEATER 40  // External feedstock preheater (RTD0)
+#define PIN_SPI_CS_RTD_LIQUID_REACTOR      42  // Internal liquid phase reactor (RTD1)
+#define PIN_SPI_CS_RTD_GAS_REACTOR_INT     44  // Internal gas phase reactor (RTD2)
+#define PIN_SPI_CS_RTD_GAS_REACTOR_EXT     46  // External gas phase reactor (RTD3)
+
+// Backward-compatible alias definitions
+#define PIN_SPI_CS_RTD_PREHEATER     PIN_SPI_CS_RTD_FEEDSTOCK_PREHEATER
+#define PIN_SPI_CS_RTD_LIQUID_REAC   PIN_SPI_CS_RTD_LIQUID_REACTOR
+#define PIN_SPI_CS_RTD_GAS_REAC_INT  PIN_SPI_CS_RTD_GAS_REACTOR_INT
+#define PIN_SPI_CS_RTD_GAS_REAC_EXT  PIN_SPI_CS_RTD_GAS_REACTOR_EXT
+#define PIN_SPI_CS_TC_FEEDSTOCK_PREHEATER PIN_SPI_CS_RTD_FEEDSTOCK_PREHEATER
+#define PIN_SPI_CS_TC_LIQUID_REACTOR PIN_SPI_CS_RTD_LIQUID_REACTOR
+#define PIN_SPI_CS_TC_GAS_REACTOR_INT PIN_SPI_CS_RTD_GAS_REACTOR_INT
+#define PIN_SPI_CS_TC_GAS_REACTOR_EXT PIN_SPI_CS_RTD_GAS_REACTOR_EXT
 // --- Analog Inputs ---
 #define PIN_H2_SENSOR A0 // MQ-8 Hydrogen Sensor (Analog Out)
 

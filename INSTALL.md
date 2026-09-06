@@ -8,15 +8,29 @@ This guide provides instructions for setting up both the **embedded firmware** (
    - **Sensor Arduino** (Arduino Mega)
    - **Pump Arduino** (Arduino Uno)
 2. Wire all sensors, breakout boards, and heater solid-state relays (SSRs) to the **Arduino Mega** as follows:
-   - **SPI Thermocouple Breakout Boards (MAX31855)**:
-      - **Common Pins**: Connect the **CLK** (Clock) pin of all 6 breakout boards to Mega **Pin 7**, and the **DO** (Data Out) pin of all 6 boards to Mega **Pin 5**. Power all boards with **3.3V/5V** and common **GND**.
-     - **Chip Select (CS) Pins**:
-        - **Electronics Housing**: Connect CS to Mega **Pin 36**.
-        - **Feedstock Reservoir**: Connect CS to Mega **Pin 38**.
-        - **External Feedstock Preheater**: Connect CS to Mega **Pin 40**.
-        - **Internal Liquid Phase Reactor**: Connect CS to Mega **Pin 42**.
-        - **Internal Gas Phase Reactor**: Connect CS to Mega **Pin 44**.
-        - **External Gas Phase Reactor**: Connect CS to Mega **Pin 46**.
+    - **PWFusion SEN-30203 Quad PT100 RTD Shield (MAX31865)**:
+      - **SPI Bus**: Connect via the 9-pin auxiliary breakout header using Hardware SPI:
+        - **SCK**: Mega **Pin 52** (or ICSP-3)
+        - **SDO (MISO)**: Mega **Pin 50** (or ICSP-1)
+        - **SDI (MOSI)**: Mega **Pin 51** (or ICSP-4)
+        - **VIN**: Mega **5V**
+        - **GND**: Mega **GND**
+      - **Chip Select (CS) Pins** (prevents PWM conflicts on D6/D8/D9):
+        - **RTD0 (Feedstock Preheater)**: Connect CS0 to Mega **Pin 40**.
+        - **RTD1 (Liquid Phase Reactor)**: Connect CS1 to Mega **Pin 42**.
+        - **RTD2 (Gas Phase Reactor Interior)**: Connect CS2 to Mega **Pin 44**.
+        - **RTD3 (Gas Phase Reactor Exterior)**: Connect CS3 to Mega **Pin 46**.
+      - **Probe Connections (3-Wire PT100)**:
+        - `FRC+`: Red Lead #1
+        - `RTD+`: Red Lead #2
+        - `RTD-`: White Lead
+        - `FRC-`: *Leave Unconnected*
+      - *See [`documents/RTD_MIGRATION_PLAN.md`](documents/RTD_MIGRATION_PLAN.md) for full wiring tables and calibration.*
+    - **Auxiliary Thermocouple Breakout Boards (MAX31855)**:
+      - **Common Pins**: Connect **CLK** to Mega **Pin 7**, and **DO** to Mega **Pin 5** (Software SPI). Power with **5V/3.3V** and **GND**.
+      - **Chip Select (CS) Pins**:
+        - **Feedstock Reservoir**: Mega **Pin 38**.
+        - **Electronics Housing**: Mega **Pin 36**.
     - **Analog Hydrogen Sensor (MQ-8)**:
       - Connect the sensor's **AO** (Analog Output) pin to Mega **Analog Input Pin A0**.
       - Power the sensor board with **5V** and common **GND**.
